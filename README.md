@@ -4,11 +4,19 @@
 
 **Show what you're watching in Chrome on your Discord profile.**
 
-[Download for Windows](https://github.com/smilekritik/browser-watchkit/releases/latest) · [Install](#install) · [Use WatchKit](#use-watchkit) · [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4)](#install)
+[![Chrome](https://img.shields.io/badge/Chrome-119%2B-4285F4)](#install)
+[![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-2EA043)](LICENSE)
+
+[Download for Windows](https://github.com/smilekritik/browser-watchkit/releases/latest) · [Install](#install) · [Discord setup](#get-a-discord-application-id) · [Use WatchKit](#use-watchkit) · [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
 
 </div>
 
 WatchKit follows the selected Chrome tab. The Discord card shows the site, video title, preview when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
+
+## WatchKit for Chrome and VLC
+
+Use the same Discord application in both editions. Enter the same **Application ID** in Chrome and VLC to publish playback under one name on your Discord profile. You only need to create the application once. [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
 
 ## Screenshots
 
@@ -40,15 +48,16 @@ Use the same Application ID for WatchKit in Chrome and VLC. If you already have 
 
 ![Where to create an application and where to copy its ID in the Discord Developer Portal](docs/screenshots/discord-application-id.svg)
 
-The Application ID is the public numeric identifier. You can use an application without creating a bot or copying a token. For optional fallback artwork, upload an image under **Rich Presence > Art Assets** in the same application and copy its asset key.
+The Application ID is public. You can set up Rich Presence with the ID alone, without creating a bot or copying a token. For optional fallback artwork, upload an image under **Rich Presence → Art Assets** in that application and copy its asset key.
 
 ## Connect Discord in Chrome
 
-1. Open and sign in to Discord desktop.
+1. Open the Discord desktop app and sign in.
 2. Open the WatchKit popup and click **Set up Discord** or the **Settings** icon. In the settings tab, paste your **Application ID** and click **Save settings**. The field masks the ID. Click **Show** if you want to check it. If WatchKit for VLC already has an ID saved under the same Windows account, click **Import ID from WatchKit for VLC**. [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
 3. Open a video tab. In the popup, choose **Allow this site** for a video served by the current site. When the site embeds a player on another domain, open **Settings → Website access → Allow all websites** to give WatchKit access to both the page and the player. Return to the video tab.
-4. Turn **Sharing** on, play the video, and keep its tab selected. Look for **Sharing on Discord** in the popup and check the card on your Discord profile. If the card is missing, open Discord's **User Settings → Activity Privacy** and enable activity sharing.
+4. Turn on **Share on Discord**, play the video, and keep its tab selected. Look for **Sharing on Discord** in the popup and check the card on your Discord profile.
 
+If the card is missing, open Discord's **User Settings → Activity Privacy** and enable activity sharing. Check that WatchKit has the Application ID from **General Information**.
 
 ## Use WatchKit
 
