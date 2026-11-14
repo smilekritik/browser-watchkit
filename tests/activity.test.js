@@ -1,9 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowedPage, bestMedia, toActivity, validId } from "../extension/activity.js";
+import { allowedPage, bestMedia, toActivity, validId, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
 const normalDigits = value => value.detail.normalize("NFKC");
+
+test("uses YummyAnime metadata for Kodik while keeping the player's timing", () => {
+  const kodik = { ...paused, source: "kodikplayer.com", title: "Kodik Player", state: "playing" };
+  const page = {
+    source: "YummyAnime",
+    title: "Great Lord! 3rd Season · Episode 9",
+    artwork: "https://static.yani.tv/posters/full/1636859220.jpg"
+  };
+  const activity = toActivity(withPageMetadata(kodik, page));
+  assert.equal(activity.title, `YummyAnime · ${page.title}`);
+  assert.equal(activity.image, page.artwork);
+  assert.equal(activity.detail, toActivity(kodik).detail);
+  assert.equal(withPageMetadata(kodik, null), kodik);
+  assert.equal(withPageMetadata(null, page), null);
+  const other = { ...kodik, source: "example.com" };
+  assert.equal(withPageMetadata(other, page), other);
+});
+
+test("uses season and episode from the active Habster player", () => {
+  const player = { ...paused, source: "befriend.stravers.live", season: "2", episode: "4", state: "playing" };
+  const page = { source: "Habster", title: "Silo", artwork: "" };
+  assert.equal(toActivity(withPageMetadata(player, page)).title, "Habster · Silo · Season 2, Episode 4");
+  assert.equal(toActivity(withPageMetadata({ ...player, season: "3", episode: "1" }, page)).title,
+    "Habster · Silo · Season 3, Episode 1");
+  assert.equal(toActivity(withPageMetadata({ ...player, episode: undefined }, page)).title, "Habster · Silo");
+});
 
 test("formats WatchKit timing at the actual playback speed", () => {
   const activity = toActivity(paused, "watchkit");

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WatchKit settings</title>
+  <link rel="stylesheet" href="popup.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body class="options">
+  <main>
+    <header class="page-heading">
+      <svg class="icon" aria-hidden="true"><use href="icons.svg#settings"/></svg>
+      <h1>WatchKit settings</h1>
+    </header>
+    <div class="preferences">
+      <section class="panel" aria-labelledby="discord-heading">
+        <h2 id="discord-heading"><svg class="icon" aria-hidden="true"><use href="icons.svg#play"/></svg>Discord</h2>
+        <form id="config">
+          <label for="application">Application ID</label>
+          <div class="input-action">
+            <input id="application" type="password" inputmode="numeric" maxlength="20" pattern="[0-9]{16,20}" autocomplete="off" aria-describedby="application-hint">
+            <button id="show-id" type="button" aria-controls="application" aria-label="Show Application ID">Show</button>
+          </div>
+          <p class="hint" id="application-hint"><a href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">Find your Application ID</a></p>
+          <label for="image">Fallback artwork key <span>(optional)</span></label>
+          <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off" aria-describedby="image-hint">
+          <p class="hint" id="image-hint">Enter an Art Assets key from your Discord application to use when the video has no preview.</p>
+          <div class="actions">
+            <button class="primary" type="submit">Save settings</button>
+            <button id="import-vlc" type="button">Import ID from WatchKit for VLC</button>
+          </div>
+          <p id="discord-notice" class="hint feedback" role="status"></p>
+        </form>
+      </section>
+      <section class="panel" aria-labelledby="access-heading">
+        <h2 id="access-heading"><svg class="icon" aria-hidden="true"><use href="icons.svg#globe"/></svg>Website access</h2>
+        <p class="hint">Allow all websites to track players embedded from a different domain. For individual sites, use the WatchKit toolbar popup.</p>
+        <button id="allow-all" type="button">Allow all websites</button>
+        <p id="access-notice" class="hint feedback" role="status"></p>
+        <div class="site-rules">
+          <h3>Excluded and paused sites</h3>
+          <form id="add-site">
+            <label for="site-rule">Domain or URL</label>
+            <div class="input-action">
+              <input id="site-rule" type="text" inputmode="url" placeholder="example.com" required aria-describedby="rules-hint">
+              <button type="submit">Exclude</button>
+            </div>
+            <p class="hint" id="rules-hint">A rule also applies to subdomains.</p>
+          </form>
+          <p class="hint" id="rules-empty">No sites excluded or paused.</p>
+          <ul id="rules-list"></ul>
+          <p id="rules-notice" class="hint feedback" role="status"></p>
+        </div>
+      </section>
+      <section class="panel shortcut-panel" aria-labelledby="shortcut-heading">
+        <div>
+          <h2 id="shortcut-heading"><svg class="icon" aria-hidden="true"><use href="icons.svg#keyboard"/></svg>Keyboard shortcut</h2>
+          <p class="hint">Toggle sharing while Chrome is focused.</p>
+        </div>
+        <div class="actions">
+          <kbd id="shortcut-key" hidden></kbd>
+          <button id="shortcut-settings" type="button">Change shortcut</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

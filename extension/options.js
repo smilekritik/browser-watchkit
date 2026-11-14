@@ -1,0 +1,129 @@
+import { browserArtworkKey, defaultSettings, siteRule, validId } from "./activity.js";
+import { allWeb, byId, getRules, setRule } from "./preferences.js";
+
+const application = byId("application");
+const image = byId("image");
+const discordNotice = byId("discord-notice");
+const rulesNotice = byId("rules-notice");
+const allowAll = byId("allow-all");
+const saved = await chrome.storage.local.get(defaultSettings);
+application.value = saved.applicationId;
+image.value = browserArtworkKey(saved.image);
+
+byId("show-id").onclick = event => {
+  const show = application.type === "password";
+  application.type = show ? "text" : "password";
+  event.currentTarget.textContent = show ? "Hide" : "Show";
+  event.currentTarget.setAttribute("aria-label", show ? "Hide Application ID" : "Show Application ID");
+};
+
+byId("config").onsubmit = async event => {
+  event.preventDefault();
+  try {
+    image.value = browserArtworkKey(image.value);
+    await chrome.storage.local.set({ applicationId: application.value.trim(), image: image.value });
+    discordNotice.textContent = "Settings saved.";
+  } catch {
+    discordNotice.textContent = "Could not save Discord settings.";
+  }
+};
+
+byId("import-vlc").onclick = async () => {
+  try {
+    const config = await chrome.runtime.sendNativeMessage("com.smilekritik.browser_watchkit", { type: "import-vlc" });
+    if (!validId(config?.applicationId)) {
+      discordNotice.textContent = "WatchKit for VLC has no saved Application ID.";
+      return;
+    }
+    await chrome.storage.local.set({ applicationId: config.applicationId });
+    application.value = config.applicationId;
+    discordNotice.textContent = "Application ID imported.";
+  } catch {
+    discordNotice.textContent = "Install the WatchKit bridge to import a saved ID.";
+  }
+};
+
+async function updateAccess() {
+  const granted = await chrome.permissions.contains({ origins: allWeb });
+  allowAll.textContent = granted ? "Remove all-sites access" : "Allow all websites";
+  allowAll.dataset.granted = String(granted);
+}
+
+allowAll.onclick = async () => {
+  const notice = byId("access-notice");
+  try {
+    const granted = allowAll.dataset.granted === "true";
+    const changed = granted ? await chrome.permissions.remove({ origins: allWeb })
+      : await chrome.permissions.request({ origins: allWeb });
+    notice.textContent = changed ? "" : "Website access stayed the same.";
+    await updateAccess();
+  } catch {
+    notice.textContent = "Could not change website access.";
+  }
+};
+
+async function updateRules() {
+  const [permanent, session] = await Promise.all([getRules("permanent"), getRules("session")]);
+  const rules = [
+    ...permanent.map(rule => ({ rule, kind: "permanent" })),
+    ...session.filter(rule => !permanent.includes(rule)).map(rule => ({ rule, kind: "session" }))
+  ];
+  byId("rules-list").replaceChildren(...rules.map(({ rule, kind }) => {
+    const row = document.createElement("li");
+    const label = document.createElement("div");
+    const domain = document.createElement("strong");
+    domain.textContent = rule === "file:" ? "Local files" : rule;
+    const description = document.createElement("p");
+    description.className = "hint";
+    description.textContent = kind === "session" ? "Paused until Chrome restarts" : "Excluded";
+    label.append(domain, description);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.textContent = "Remove";
+    remove.setAttribute("aria-label", `Remove rule for ${domain.textContent}`);
+    remove.onclick = async () => {
+      try {
+        await setRule(kind, rule, false);
+        await updateRules();
+        rulesNotice.textContent = "Site rule removed.";
+        byId("site-rule").focus();
+      } catch {
+        rulesNotice.textContent = "Could not remove the site rule.";
+      }
+    };
+    row.append(label, remove);
+    return row;
+  }));
+  byId("rules-empty").hidden = rules.length > 0;
+}
+
+byId("add-site").onsubmit = async event => {
+  event.preventDefault();
+  const field = byId("site-rule");
+  const rule = siteRule(field.value);
+  if (!rule) {
+    rulesNotice.textContent = "Enter a domain or website URL.";
+    field.focus();
+    return;
+  }
+  try {
+    await setRule("permanent", rule, true);
+    field.value = "";
+    rulesNotice.textContent = "Site excluded.";
+    await updateRules();
+  } catch {
+    rulesNotice.textContent = "Could not save the site rule.";
+  }
+};
+
+const commands = await chrome.commands.getAll();
+const shortcut = commands.find(command => command.name === "toggle-sharing")?.shortcut;
+byId("shortcut-key").textContent = shortcut ?? "";
+byId("shortcut-key").hidden = !shortcut;
+byId("shortcut-settings").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if ((area === "local" && changes.blockedHosts) || (area === "session" && changes.pausedHosts)) void updateRules();
+});
+chrome.permissions.onAdded.addListener(updateAccess);
+chrome.permissions.onRemoved.addListener(updateAccess);
+await Promise.all([updateAccess(), updateRules()]);

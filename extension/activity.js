@@ -107,3 +107,17 @@ export function bestMedia(frames, now) {
   }
   return best?.media ?? null;
 }
+
+const pagePlayers = new Map([
+  ["YummyAnime", ["kodikplayer.com"]],
+  ["Habster", ["befriend.stravers.live", "initem.ws"]]
+]);
+
+export function withPageMetadata(media, page) {
+  if (!page || !media || !matchingHost(media.source ?? "", pagePlayers.get(page.source) ?? [])) return media;
+  let title = page.title;
+  if (page.source === "Habster" && media.episode) {
+    title += media.season ? ` · Season ${media.season}, Episode ${media.episode}` : ` · Episode ${media.episode}`;
+  }
+  return { ...media, source: page.source, title, artwork: page.artwork || media.artwork };
+}

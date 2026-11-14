@@ -7,78 +7,45 @@
   <link rel="stylesheet" href="popup.css">
   <script type="module" src="popup.js"></script>
 </head>
-<body>
-  <main class="settings">
-    <header>
-      <h1>WatchKit <span>for Chrome</span></h1>
-      <label class="sharing-toggle">
-        <input id="enabled" type="checkbox" role="switch" aria-label="Share activity on Discord">
-        <span class="switch-track" aria-hidden="true"></span>
-        <span class="sharing-on" aria-hidden="true">Sharing on</span>
-        <span class="sharing-off" aria-hidden="true">Sharing off</span>
-      </label>
+<body class="popup">
+  <main>
+    <header class="topbar">
+      <h1>WatchKit</h1>
+      <button id="settings" class="icon-button" type="button" aria-label="Open settings" title="Settings">
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#settings"/></svg>
+      </button>
     </header>
-    <section aria-label="Discord activity" class="activity">
-      <span class="play-mark" aria-hidden="true"></span>
-      <div class="activity-copy">
+    <label class="sharing-toggle">
+      <span>Share on Discord</span>
+      <input id="enabled" type="checkbox" role="switch">
+      <span class="switch-track" aria-hidden="true"></span>
+    </label>
+    <section class="activity" aria-label="Discord activity">
+      <svg class="icon" aria-hidden="true"><use href="icons.svg#play"/></svg>
+      <div>
         <p id="status" role="status">Loading…</p>
         <strong id="video"></strong>
         <p id="timing"></p>
       </div>
     </section>
-    <div id="setup-row" hidden>
-      <a class="primary button" href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">Set up Discord</a>
-    </div>
-    <div class="preferences">
-      <section class="panel" aria-labelledby="access-heading">
-        <h2 id="access-heading">Website access</h2>
-        <div class="access">
-          <button id="allow-all" type="button">Allow all websites</button>
-          <button id="allow-site" type="button">Allow this site</button>
-        </div>
-        <div class="current-site" id="current-site" hidden>
-          <p><strong id="site-name"></strong></p>
-          <p class="hint" id="site-state"></p>
-          <div class="actions">
-            <button id="pause-site" type="button" aria-describedby="pause-hint">Pause for this session</button>
-            <button id="block-site" type="button">Exclude permanently</button>
-            <button id="resume-site" type="button" hidden>Resume tracking</button>
-          </div>
-          <p class="hint" id="pause-hint">A pause ends when Chrome restarts.</p>
-        </div>
-        <div class="site-rules">
-          <h3>Site exclusions</h3>
-          <p class="hint">A domain rule includes its subdomains.</p>
-          <form id="add-site">
-            <label for="site-rule">Domain or URL</label>
-            <div class="domain-input">
-              <input id="site-rule" type="text" inputmode="url" placeholder="example.com" required>
-              <button type="submit">Exclude</button>
-            </div>
-          </form>
-          <p class="hint" id="rules-empty">No sites excluded or paused.</p>
-          <ul id="rules-list"></ul>
-        </div>
-      </section>
-      <section class="panel" aria-labelledby="discord-heading">
-        <h2 id="discord-heading">Discord settings</h2>
-        <p class="hint" id="application-hint"><a href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">How to get an Application ID</a></p>
-        <form id="config">
-          <label for="application">Discord Application ID</label>
-          <input id="application" inputmode="numeric" maxlength="20" pattern="[0-9]{16,20}" autocomplete="off" aria-describedby="application-hint">
-          <label for="image">Fallback artwork key <span>(optional)</span></label>
-          <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off">
-          <div class="actions">
-            <button class="primary" type="submit">Save</button>
-            <button id="import-vlc" type="button">Import saved ID</button>
-          </div>
-        </form>
-      </section>
-    </div>
-    <footer>
-      <p id="notice" role="status">WatchKit shares video details from the selected tab.</p>
-      <button id="shortcut-settings" type="button">Keyboard shortcut <kbd id="shortcut-key" hidden></kbd></button>
-    </footer>
+    <button id="setup-row" class="primary setup" type="button" hidden>Set up Discord</button>
+    <section id="current-site" class="site-panel" aria-label="Current website" hidden>
+      <div class="site-header">
+        <svg class="icon" aria-hidden="true"><use href="icons.svg#globe"/></svg>
+        <div><strong id="site-name"></strong><p id="site-state" class="hint"></p></div>
+      </div>
+      <div class="actions">
+        <button id="allow-site" type="button" hidden>Allow this site</button>
+        <button id="pause-site" type="button" title="Tracking resumes after Chrome restarts" hidden>
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#pause"/></svg>Pause until restart
+        </button>
+        <button id="block-site" type="button">
+          <svg class="icon" aria-hidden="true"><use href="icons.svg#ban"/></svg>Exclude site
+        </button>
+        <button id="resume-site" type="button" hidden>Resume tracking</button>
+      </div>
+    </section>
+    <p id="notice" class="hint feedback" role="status"></p>
   </main>
 </body>
 </html>

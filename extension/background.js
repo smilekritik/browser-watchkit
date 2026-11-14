@@ -1,4 +1,4 @@
-import { allowedPage, bestMedia, defaultSettings, toActivity, validId } from "./activity.js";
+import { allowedPage, bestMedia, defaultSettings, toActivity, validId, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 let settings = defaultSettings;
@@ -99,7 +99,9 @@ function publish(activity) {
 }
 
 function preview() {
-  return current ? toActivity(bestMedia(current.samples.values(), Date.now()), settings.image) : null;
+  if (!current) return null;
+  const media = bestMedia(current.samples.values(), Date.now());
+  return toActivity(withPageMetadata(media, current.pageMetadata), settings.image);
 }
 
 function updatePresence() {
@@ -206,11 +208,17 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     reply({ connection, activity: preview() });
     return;
   }
-  if (message?.type !== "media") return;
+  if (!["media", "page-metadata"].includes(message?.type)) return;
   const matches = current && sender.tab?.id === current.id && message.token === current.token
     && current.documents.get(sender.frameId) === sender.documentId;
   if (!matches) {
     reply({ watching: false });
+    return;
+  }
+  if (message.type === "page-metadata") {
+    if (sender.frameId !== 0) return;
+    current.pageMetadata = message.page;
+    updatePresence();
     return;
   }
   if (message.media) current.samples.set(sender.frameId, { media: message.media, seenAt: Date.now() });
