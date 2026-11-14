@@ -27,7 +27,7 @@
       </div>
     </section>
     <div id="setup-row" hidden>
-      <a class="primary button" href="https://discord.com/developers/applications" target="_blank" rel="noreferrer">Create a Discord application</a>
+      <a class="primary button" href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">Set up Discord</a>
     </div>
     <div class="preferences">
       <section class="panel" aria-labelledby="access-heading">
@@ -62,7 +62,7 @@
       </section>
       <section class="panel" aria-labelledby="discord-heading">
         <h2 id="discord-heading">Discord settings</h2>
-        <p class="hint" id="application-hint">Reuse the Application ID saved by <a href="https://github.com/smilekritik/vlc-watchkit" target="_blank" rel="noreferrer">WatchKit for VLC</a>, or enter an ID from the Discord Developer Portal.</p>
+        <p class="hint" id="application-hint"><a href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">How to get an Application ID</a></p>
         <form id="config">
           <label for="application">Discord Application ID</label>
           <input id="application" inputmode="numeric" maxlength="20" pattern="[0-9]{16,20}" autocomplete="off" aria-describedby="application-hint">
@@ -70,13 +70,15 @@
           <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off">
           <div class="actions">
             <button class="primary" type="submit">Save</button>
-            <button id="import-vlc" type="button">Import from VLC</button>
+            <button id="import-vlc" type="button">Import saved ID</button>
           </div>
         </form>
-        <a class="portal" href="https://discord.com/developers/applications" target="_blank" rel="noreferrer">Discord Developer Portal</a>
       </section>
     </div>
-    <p id="notice" role="status">WatchKit shares video details from the selected tab.</p>
+    <footer>
+      <p id="notice" role="status">WatchKit shares video details from the selected tab.</p>
+      <button id="shortcut-settings" type="button">Keyboard shortcut <kbd id="shortcut-key" hidden></kbd></button>
+    </footer>
   </main>
 </body>
 </html>

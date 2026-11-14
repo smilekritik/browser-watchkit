@@ -48,6 +48,12 @@ const ruleStores = {
   session: [chrome.storage.session, "pausedHosts"]
 };
 const notice = byId("notice");
+const shortcutKey = byId("shortcut-key");
+const commands = await chrome.commands.getAll();
+const shortcut = commands.find(command => command.name === "toggle-sharing")?.shortcut;
+shortcutKey.textContent = shortcut ?? "";
+shortcutKey.hidden = !shortcut;
+byId("shortcut-settings").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
 
 async function getRules(kind) {
   const [storage, key] = ruleStores[kind];
@@ -138,15 +144,15 @@ byId("import-vlc").addEventListener("click", async () => {
   try {
     const config = await chrome.runtime.sendNativeMessage("com.smilekritik.browser_watchkit", { type: "import-vlc" });
     if (!validId(config?.applicationId)) {
-      byId("notice").textContent = "No Discord Application ID found in WatchKit for VLC.";
+      byId("notice").textContent = "No saved Application ID found.";
       return;
     }
     await chrome.storage.local.set({ applicationId: config.applicationId });
     application.value = config.applicationId;
-    byId("notice").textContent = "Application ID imported from VLC.";
+    byId("notice").textContent = "Application ID imported.";
     await refreshStatus();
   } catch {
-    byId("notice").textContent = "Install the WatchKit bridge to import settings from VLC.";
+    byId("notice").textContent = "Install the WatchKit bridge to import a saved ID.";
   }
 });
 const stateText = {
@@ -177,6 +183,10 @@ async function refreshStatus() {
 await updatePermissions();
 await renderRules();
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.enabled) {
+    enabled.checked = changes.enabled.newValue ?? defaultSettings.enabled;
+    void refreshStatus();
+  }
   if ((area === "local" && changes.blockedHosts) || (area === "session" && changes.pausedHosts)) void renderRules();
 });
 await refreshStatus();

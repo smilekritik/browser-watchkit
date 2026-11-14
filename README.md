@@ -8,7 +8,15 @@
 
 </div>
 
-WatchKit follows the selected Chrome tab. The Discord card shows the site, video title, preview when available, playback speed, and time left.
+WatchKit follows the selected Chrome tab. The Discord card shows the site, video title, preview when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
+
+## Screenshots
+
+| Bilibili video | Twitch live stream |
+| --- | --- |
+| ![Discord activity with a Bilibili video, thumbnail and time remaining](docs/screenshots/discord-bilibili.png) | ![Discord activity with a live Twitch stream and channel artwork](docs/screenshots/discord-twitch.png) |
+
+![WatchKit settings with sharing, site exclusions, Discord setup and keyboard shortcut](docs/screenshots/chrome-settings.png)
 
 ## Install
 
@@ -23,21 +31,32 @@ Unblock-File -LiteralPath ./scripts/install.ps1
 ./scripts/install.ps1
 ```
 
-## Connect Discord
+## Get a Discord Application ID
+
+Use the same Application ID for WatchKit in Chrome and VLC. If you already have a Discord application for WatchKit, open it and skip to step 3.
+
+1. Sign in to the [Discord Developer Portal](https://discord.com/developers/applications) and choose **New Application**.
+2. Enter `WatchKit` as the name and click **Create**. Discord uses that name in the activity heading.
+3. In your application's sidebar, open **General Information**. Find **Application ID** and click **Copy**.
+
+![Where to create an application and where to copy its ID in the Discord Developer Portal](docs/screenshots/discord-application-id.svg)
+
+The Application ID is the public numeric identifier. For optional fallback artwork, upload an image under **Rich Presence > Art Assets** in the same application and copy its asset key.
+
+## Connect Discord in Chrome
 
 1. Open and sign in to Discord desktop.
-2. If you already configured [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit) on this Windows account, click **Import from VLC** in the WatchKit popup. It copies the saved Discord Application ID.
-3. For a new setup, open the [Discord Developer Portal](https://discord.com/developers/applications), choose **New Application**, and name it `WatchKit`. Copy **Application ID** from **General Information**, paste it in the popup, and click **Save**. Discord uses the application's name for the card heading.
-4. Open a video tab. In the popup, choose **Allow this site** or **Allow all websites**, then turn sharing on. Play the video and check your Discord profile.
+2. Paste the Application ID into the WatchKit popup and click **Save**. If [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit) already has an ID saved under the same Windows account, **Import saved ID** copies it into Chrome.
+3. Open a video tab. In the popup, choose **Allow this site** or **Allow all websites**, then turn sharing on. Play the video and check your Discord profile.
 
-The application ID is public. If you want fallback artwork, upload an image under **Rich Presence > Art Assets** in the same application and enter its key in the popup.
 
 ## Use WatchKit
 
 - Switching tabs switches the activity. Selecting a tab without video clears it. Opening Discord or another app leaves the last selected Chrome tab as the source.
 - Open the popup on a website to **Pause for this session** or **Exclude permanently**. Manage both under **Site exclusions**. A domain rule also covers its subdomains.
 - For local videos, enable **Allow access to file URLs** in the extension's Chrome details and grant access from the popup. The activity title is `Local video`.
-- To clear the activity from any tab, turn sharing off in the popup.
+- Press **Ctrl+Shift+Y** while Chrome is focused to turn tracking off across the browser and clear the Discord activity. Press it again to resume. The toolbar icon shows **OFF** while tracking is off, and WatchKit remembers the setting after Chrome restarts.
+- To change the shortcut or assign one if it is unbound, click **Keyboard shortcut** in the popup or open `chrome://extensions/shortcuts` and find **Toggle WatchKit tracking**.
 
 WatchKit detects accessible HTML video, including players in frames that Chrome allows it to read. Some sites expose limited metadata or use inaccessible players. Chrome internal pages and incognito windows are outside its scope.
 

@@ -139,7 +139,10 @@ button:not(:disabled):hover { border-color: var(--accent); }
 .primary { background: var(--accent); color: var(--button-text); border-color: transparent; }
 a { color: var(--accent); }
 .portal { display: inline-block; font-size: 13px; }
-#notice { margin-top: 14px; }
+footer { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; }
+#notice { flex: 1 1 230px; }
+#shortcut-settings { padding: 4px 7px; font-size: 12px; }
+#shortcut-key { margin-left: 4px; font-size: 11px; color: var(--muted); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media (min-width: 700px) {

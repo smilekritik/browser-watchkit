@@ -11,6 +11,8 @@ let connection = "idle";
 let retryAt = 0;
 let lastPacket = "";
 let expiry;
+let badgeEnabled;
+let toggleSharing = Promise.resolve();
 const previousWatch = chrome.storage.session.get("watch").then(({ watch }) => {
   if (watch) return chrome.tabs.sendMessage(watch.id, { type: "stop", token: watch.token }).catch(() => {});
 });
@@ -125,6 +127,10 @@ async function refresh(force = false) {
   selectedTabId = tab?.id;
   const changed = stored.applicationId !== settings.applicationId || stored.image !== settings.image;
   settings = stored;
+  if (badgeEnabled !== settings.enabled) {
+    badgeEnabled = settings.enabled;
+    void chrome.action.setBadgeText({ text: badgeEnabled ? "" : "OFF" }).catch(console.error);
+  }
   pausedHosts = session.pausedHosts;
   const eligible = settings.enabled && validId(settings.applicationId) && tab?.id != null
     && !tab.incognito && allowedPage(tab.url, [...settings.blockedHosts, ...pausedHosts]);
@@ -159,6 +165,13 @@ function scheduleRefresh(force) {
   void refresh(force).catch(console.error);
 }
 
+chrome.commands.onCommand.addListener(command => {
+  if (command !== "toggle-sharing") return;
+  toggleSharing = toggleSharing.then(async () => {
+    const { enabled } = await chrome.storage.local.get({ enabled: defaultSettings.enabled });
+    await chrome.storage.local.set({ enabled: !enabled });
+  }).catch(console.error);
+});
 chrome.tabs.onActivated.addListener(() => scheduleRefresh(false));
 chrome.tabs.onUpdated.addListener((id, info) => {
   if (id === selectedTabId && info.url) scheduleRefresh(false);
