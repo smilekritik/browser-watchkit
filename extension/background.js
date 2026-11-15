@@ -2,6 +2,7 @@ import { allowedPage, bridgeAdvice, choosePlayback, defaultSettings, episodeFrom
   toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
+const windowTypes = ["normal", "app", "popup"];
 let settings = defaultSettings;
 let pausedHosts = [];
 const watches = new Map();
@@ -125,7 +126,7 @@ function preview() {
   const custom = withPageMetadata(media, tab.pageMetadata);
   const video = custom !== media ? custom : withEpisodePage(media, tab.episode, tab.pageMetadata?.episodePage);
   const activity = toActivity(video, settings.image, background);
-  return { activity, background, url: tab.url, tabId: tab.id };
+  return { activity, background, url: video.clipUrl ?? tab.url, tabId: tab.id };
 }
 
 function updatePresence() {
@@ -148,13 +149,14 @@ function updatePresence() {
 async function refresh(force = false) {
   const generation = ++revision;
   await previousWatches;
-  const [[selected], stored, session] = await Promise.all([
-    chrome.tabs.query({ active: true, lastFocusedWindow: true, windowType: "normal" }),
+  const [focused, stored, session] = await Promise.all([
+    chrome.windows.getLastFocused({ populate: true, windowTypes }).catch(() => null),
     chrome.storage.local.get(defaultSettings),
     chrome.storage.session.get({ pausedHosts: [] })
   ]);
   const enabled = stored.enabled && validId(stored.applicationId);
-  const background = enabled && stored.backgroundPlayback ? await chrome.tabs.query({ audible: true, windowType: "normal" }) : [];
+  const selected = focused?.tabs?.find(tab => tab.active);
+  const background = enabled && stored.backgroundPlayback ? await chrome.tabs.query({ audible: true }) : [];
   if (generation !== revision) return;
   selectedTabId = selected?.id;
   const changedId = stored.applicationId !== settings.applicationId;
@@ -251,7 +253,7 @@ chrome.tabs.onRemoved.addListener(tabRemoved);
 chrome.tabs.onReplaced.addListener((_, removedId) => tabRemoved(removedId));
 chrome.windows.onFocusChanged.addListener(id => {
   if (id !== chrome.windows.WINDOW_ID_NONE) scheduleRefresh(false);
-});
+}, { windowTypes });
 chrome.webNavigation.onCommitted.addListener(frame => {
   const tab = watches.get(frame.tabId);
   if (!tab) {

@@ -72,6 +72,8 @@ If the card is missing, open Discord's **User Settings → Activity Privacy** an
 
 WatchKit detects accessible HTML video and audio, including players in frames that Chrome allows it to read. Playback that only uses Web Audio or an inaccessible player may not be detected. Chrome internal pages and incognito windows are outside its scope.
 
+Installed Chrome web apps can also share playback when they use the same Chrome profile and the site is allowed in WatchKit.
+
 ### Music, podcasts and radio
 
 WatchKit uses **Listening** for audio playback. Artist and artwork depend on the information exposed by the player. See [player detection](docs/PLAYER-DETECTION.md) for services with built-in Discord integrations or custom metadata handling.
@@ -86,7 +88,7 @@ WatchKit recognizes explicit episode labels in titles, selected episode controls
 
 The extension saves your Discord application ID, artwork key, sharing preferences, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets it follow page changes in tabs it is tracking.
 
-WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. Some public thumbnails are fitted into a square by an image resizing service. WatchKit skips external artwork URLs that contain query strings, which can carry session or access tokens. If it finds no usable URL, it uses your optional fallback artwork key. [Artwork examples and resizing](docs/PLAYER-DETECTION.md#artwork)
+WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. Some public thumbnails are fitted into a square by an image resizing service. WatchKit accepts query strings only for recognized, temporary cover image signatures. If it finds no usable URL, it uses your optional fallback artwork key. [Artwork examples and resizing](docs/PLAYER-DETECTION.md#artwork)
 
 ## Update or remove
 

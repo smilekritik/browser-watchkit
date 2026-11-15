@@ -55,6 +55,14 @@ test("shares a video page without credentials, fragments or unrelated parameters
   }
 });
 
+test("shares only the direct TikTok clip and preserves captions containing episode-like text", () => {
+  const clip = "https://www.tiktok.com/@user_play_opera.haus/video/7707755453681323286";
+  assert.equal(watchLink(clip + "?_r=1&token=private#ignored"), clip);
+  assert.equal(watchLink("https://www.tiktok.com/following"), "");
+  const result = toActivity({ ...paused, source: "TikTok", title: "Author — Edit S2E7", state: "playing" });
+  assert.equal(result.title, "TikTok · Author — Edit S2E7");
+});
+
 test("retains video and episode identifiers across link formats", () => {
   const links = [
     ["https://rt.pornhub.com/view_video.php?viewkey=ph123abc&utm_source=example",

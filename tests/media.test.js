@@ -81,6 +81,39 @@ test("prefers the current show's cover over generic metadata and other titles", 
   assert.equal(track(url, { ...opts, covers: [another, poster(cover, "current-id", null, 0)] }).artwork, fallback);
 });
 
+test("reads the selected TikTok clip's caption, author, signed cover and permalink", () => {
+  const url = "https://www.tiktok.com/@user_play_opera.haus/video/7707755453681323286";
+  const coverUrl = "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/poster~tplv-tiktokx-origin.image"
+    + "?x-expires=1794768000&x-signature=sig%3D&shp=123";
+  const poster = { alt: "Посадила. Вырастила. Собрала урожай. #Arknights", currentSrc: coverUrl, getAttribute: () => "" };
+  const author = { pathname: "/@user_play_opera.haus", textContent: "Wait_FoxsE" };
+  const overlay = { querySelector: () => author };
+  const options = {
+    title: "(18)TikTok - Make Your Day", top: true,
+    selectors: { '[data-e2e="anchoring-description-layer"]': overlay },
+    media: { closest: selector => selector.includes("xgwrapper")
+      ? { id: "xgwrapper-0-7707755453681323286" } : { querySelector: selector => selector.startsWith("img") ? poster : null } }
+  };
+  const sample = track(url, options);
+  assert.equal(sample.title, "Wait_FoxsE — Посадила. Вырастила. Собрала урожай.");
+  assert.equal(sample.artwork, coverUrl);
+  assert.equal(sample.clipUrl, url);
+  assert.equal(sample.position, 20);
+  poster.currentSrc = coverUrl + "&token=private";
+  assert.equal(track(url, options).artwork, "");
+  poster.currentSrc = coverUrl.replace("tiktokcdn.com", "tiktokcdn.com.example.com");
+  assert.equal(track(url, options).artwork, "");
+  options.selectors = {};
+  assert.equal(track(url, options).title, "@user_play_opera.haus — Посадила. Вырастила. Собрала урожай.");
+  const video = options.media;
+  const feed = track("https://www.tiktok.com/", { ...options, media: {
+    closest: selector => selector.includes("xgwrapper") ? video.closest(selector)
+      : { querySelector: query => query.startsWith("img") ? poster : author }
+  } });
+  assert.equal(feed.clipUrl, url);
+  assert.equal(track("https://www.tiktok.com/", options).clipUrl, "");
+});
+
 test("reads Alloha's selected controls and Collaps's current episode title", () => {
   const alloha = track("https://befriend.stravers.live/", { selectors: {
     '[data-select="seasonType1"] .select__item .select__item-text': { textContent: "Сезон 2" },

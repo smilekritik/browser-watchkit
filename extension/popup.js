@@ -1,7 +1,7 @@
 import { defaultSettings, isSpotify, matchingHost, siteRule, validId } from "./activity.js";
 import { byId, getRules, setRule } from "./preferences.js";
 
-const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 const url = tab?.url ? new URL(tab.url) : null;
 const origin = url?.protocol === "file:" ? "file:///*"
   : ["http:", "https:"].includes(url?.protocol) ? `${url.protocol}//${url.hostname}/*` : "";

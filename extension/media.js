@@ -9,6 +9,7 @@
   const topFrame = window === window.top;
   const audioFile = /\.(?:aac|flac|m4a|mp3|oga|opus|wav)$/i.test(location.pathname);
   const youtubeMusic = topFrame && location.hostname === "music.youtube.com";
+  const tiktok = /(?:^|\.)tiktok\.com$/.test(location.hostname);
   const legacyLibria = topFrame && /^(?:www\.)?anilibria\.(?:tv|uno)$/.test(location.hostname);
   const libria = topFrame && /^(?:www\.)?(?:anilibria|aniliberty)\.(?:top|wtf)$/.test(location.hostname);
   const yummyAnime = topFrame && location.hostname === "old.yummyani.me"
@@ -24,7 +25,7 @@
       for (const node of change.addedNodes) changed = scan(node) || changed;
       if (change.removedNodes.length && videos.size) changed = true;
     }
-    if (changed || yummyAnime || habster || legacyLibria || ((alloha || collaps) && videos.size)) schedule();
+    if (changed || yummyAnime || habster || legacyLibria || ((alloha || collaps || tiktok) && videos.size)) schedule();
   });
   let token;
   let queued;
@@ -85,6 +86,7 @@
   function selected() {
     let result = null;
     const music = audioSource();
+    const clipId = tiktok && tiktokLocation()?.[2];
     const musicVideo = youtubeMusic ? document.querySelector("ytmusic-player video.html5-main-video") : null;
     for (const [video, state] of videos) {
       if (!video.isConnected) {
@@ -108,6 +110,7 @@
         + (!video.paused ? 2_000_000 : 0)
         + (!video.muted && video.volume > 0 ? 250_000 : 0)
         + (audio && music && !video.paused ? 1_000_000 : 0)
+        + (clipId && tiktokVideoId(video) === clipId ? 4_000_000 : 0)
         + (featured ? 4_000_000 : 0);
       if (!result || score > result.score) result = { video, state, score };
     }
@@ -246,6 +249,62 @@
     return "";
   }
 
+  function tiktokLocation() {
+    return /^\/@([\w.]{1,32})\/video\/(\d{15,22})\/?$/.exec(location.pathname);
+  }
+
+  function tiktokVideoId(video) {
+    return /-(\d{15,22})$/.exec(video.closest('[id^="xgwrapper-"]')?.id ?? "")?.[1];
+  }
+
+  function tiktokCover(candidate) {
+    const publicUrl = publicArtwork(candidate);
+    if (publicUrl || !candidate) return publicUrl;
+    try {
+      const url = new URL(candidate, document.baseURI);
+      const signingFields = new Set(["dr", "x-expires", "x-signature", "t", "ps", "shp", "shcp", "idc"]);
+      // Only the still image loaded by TikTok's CDN may carry temporary signature parameters.
+      if (url.protocol === "https:" && /^p\d+(?:-[a-z\d]+)*\.tiktokcdn\.com$/.test(url.hostname)
+          && /^\/tos-[a-z\d-]+\/[\w.~%-]+\.(?:image|jpe?g|png|webp)$/i.test(url.pathname)
+          && !url.username && !url.password && !url.port && !url.hash && url.href.length <= 512
+          && url.searchParams.has("x-expires") && url.searchParams.has("x-signature")
+          && [...url.searchParams.keys()].every(key => signingFields.has(key))) return url.href;
+    } catch {
+      // Ignore malformed image URLs.
+    }
+    return "";
+  }
+
+  function tiktokDetails(video, metadata) {
+    const route = tiktokLocation();
+    const card = video.closest('[data-e2e="feed-video"], [data-e2e="recommend-list-item-container"]');
+    const id = tiktokVideoId(video) || route?.[2];
+    const overlay = id && route?.[2] === id
+      ? document.querySelector('[data-e2e="anchoring-description-layer"]') : null;
+    const cover = card?.querySelector('img[data-fmp][alt]') ?? card?.querySelector('img[alt]');
+    const overlayAuthor = overlay?.querySelector(
+      '[data-e2e="cinema-creator-identity"] a[href^="/@"]:not([data-e2e="video-author-avatar"])'
+    );
+    const currentOverlay = overlayAuthor?.pathname?.replace(/\/$/, "").toLowerCase() === `/@${route?.[1]?.toLowerCase()}`;
+    const authorLink = currentOverlay ? overlayAuthor : card?.querySelector(
+      '[data-e2e="video-author-uniqueid"][href^="/@"], [data-e2e="browse-username"][href^="/@"], ' +
+      'a[href^="/@"]:has([data-e2e="video-author-uniqueid"], [data-e2e="browse-username"])'
+    );
+    const user = /^\/@([\w.]{1,32})\/?$/.exec(authorLink?.pathname ?? "")?.[1]
+      || (route?.[2] === id ? route?.[1] : "");
+    const author = authorLink?.textContent.trim() || (user ? `@${user}` : "");
+    const description = cover?.alt?.trim()
+      || (currentOverlay ? overlay : card)?.querySelector('[data-e2e="video-desc"]')?.textContent.trim()
+      || metadata?.title?.trim() || "";
+    const caption = description.replace(/\s+#.*$/u, "").trim() || description;
+    return {
+      title: [author, caption].filter(Boolean).join(" — ").slice(0, 256) || "Video",
+      artwork: tiktokCover(cover?.currentSrc) || tiktokCover(cover?.getAttribute("src")) || tiktokCover(video.poster)
+        || (metadata?.artwork ?? []).map(item => tiktokCover(item.src)).find(Boolean) || "",
+      clipUrl: id && user ? `https://www.tiktok.com/@${user}/video/${id}` : ""
+    };
+  }
+
   function episodeCover() {
     const path = location.pathname.replace(/\/$/, "");
     const segments = path.split("/").filter(Boolean);
@@ -300,6 +359,7 @@
       live: !timing && video.duration === Infinity,
       score
     };
+    if (tiktok && !audio) Object.assign(media, tiktokDetails(video, metadata));
     if (localPlayer) {
       const panel = document.getElementById("anilibriaPlayer_playlist");
       observeEpisodePanel(panel);
@@ -423,7 +483,7 @@
     const now = performance.now();
     const interval = media?.state === "playing" ? 5000 : 10000;
     const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.muted, media.artwork,
-      media.duration, media.rate, media.state, media.live, media.season, media.episode]);
+      media.duration, media.rate, media.state, media.live, media.season, media.episode, media.clipUrl]);
     if (force || (media && (seeked || choice.video !== lastReport?.video
         || signature !== lastReport?.signature || now - sentAt >= interval))
         || (!media && lastReport)) {
