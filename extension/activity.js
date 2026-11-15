@@ -21,6 +21,38 @@ export function bridgeAdvice(error) {
   return "Turn off sharing, exit Chrome completely, and rerun Install WatchKit.bat from the latest Windows release ZIP.";
 }
 
+const playbackPath = /^\/(?:anime\/)?(?:watch|videos?|player|play|series|episodes?)(?:\/|$)/i;
+const episodeNumberPattern = /^\d{1,4}(?:\.\d{1,2})?$/;
+
+export function episodeFromUrl(value) {
+  let page;
+  try {
+    page = new URL(value);
+  } catch {
+    return null;
+  }
+  const route = playbackPath.exec(page.pathname);
+  if (!["http:", "https:"].includes(page.protocol) || !route) return null;
+
+  const parts = page.pathname.slice(route[0].length).split("/").filter(Boolean);
+  if (!parts.length && !["video_id", "videoId", "episode_id", "episodeId"].some(key =>
+    /^[\w-]{1,64}$/.test(page.searchParams.get(key) ?? ""))) return null;
+  const pathEpisode = /^(?:episode|ep)[-_](\d{1,4}(?:\.\d{1,2})?)$/i.exec(parts.at(-1))?.[1];
+  const episode = [page.searchParams.get("episode"), page.searchParams.get("ep"),
+    parts.length > 1 ? pathEpisode : null].find(number => episodeNumberPattern.test(number));
+  if (!episode) return null;
+
+  const slug = parts.slice(0, pathEpisode ? -1 : undefined).at(-1) ?? "";
+  const seasonSlug = /(?:^|[-_])season[-_](\d{1,4})$/i.exec(slug);
+  const season = [page.searchParams.get("season"), seasonSlug?.[1]].find(number => /^\d{1,4}$/.test(number));
+  const words = (seasonSlug ? slug.slice(0, seasonSlug.index) : slug).replace(/[-_]+/g, " ");
+  // Opaque provider IDs are useful in links, but are not titles.
+  const title = /^[a-z\d]+(?: [a-z\d]+)*$/i.test(words) && slug === slug.toLowerCase()
+    && (seasonSlug || words.includes(" ") || (parts.length > 1 && !pathEpisode))
+    ? words.replace(/\b[a-z]/g, letter => letter.toUpperCase()) : "";
+  return { episode, season, title, host: page.hostname.replace(/^www\./, "") };
+}
+
 export function watchLink(value, linkEpisode) {
   let page;
   try {
@@ -60,7 +92,9 @@ export function watchLink(value, linkEpisode) {
     for (const key of ["video_id", "videoId", "episode_id", "episodeId"]) {
       keep(key, /^[A-Za-z0-9_-]{1,64}$/);
     }
-    for (const key of ["season", "episode"]) keep(key, /^\d{1,4}$/);
+    keep("season", /^\d{1,4}$/);
+    keep("episode", episodeNumberPattern);
+    if (episodeFromUrl(value)) keep("ep", episodeNumberPattern);
     if (params.size && !page.searchParams.size && /\/(?:watch|view_video|player|play|embed)(?:\.[a-z]+)?$/i.test(path)) {
       return "";
     }
@@ -161,7 +195,7 @@ export function toActivity(media, image = "", background = false) {
     episodeNumber ??= episodeOnly[2];
   }
   let episodeSuffix = "";
-  if (!audio && /^\d{1,4}$/.test(episodeNumber)) {
+  if (!audio && episodeNumberPattern.test(episodeNumber)) {
     const seasonLabel = /^\d{1,4}$/.test(seasonNumber) ? `S${Number(seasonNumber)} ` : "";
     episodeSuffix = ` · ${seasonLabel}Ep.${Number(episodeNumber)}`;
   }
@@ -237,4 +271,16 @@ export function withPageMetadata(media, page) {
   if (!page || !media || !matchingHost(media.source ?? "", pagePlayers.get(page.source) ?? [])) return media;
   return { ...media, source: page.source, title: page.title,
     episode: page.episode ?? media.episode, artwork: page.artwork || media.artwork };
+}
+
+export function withEpisodePage(media, episode, page) {
+  if (!media || media.audio || !episode) return media;
+  const title = page?.title || episode.title || media.title;
+  const seasonSuffix = /\s+season\s+(\d{1,4})$/i.exec(title);
+  return { ...media, source: page?.source || episode.host,
+    title: seasonSuffix && episode.season && Number(seasonSuffix[1]) === Number(episode.season)
+      ? title.slice(0, seasonSuffix.index) : title,
+    season: episode.season ?? media.season,
+    episode: episode.episode,
+    artwork: page?.artwork || media.artwork };
 }

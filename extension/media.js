@@ -17,6 +17,7 @@
   const alloha = location.hostname === "befriend.stravers.live";
   const collaps = /^(?:api\d*\.)?initem\.ws$/.test(location.hostname);
   const episodeObserver = yummyAnime || legacyLibria ? new MutationObserver(() => schedule()) : null;
+  const titleObserver = topFrame ? new MutationObserver(() => schedule()) : null;
   const observer = new MutationObserver(changes => {
     let changed = false;
     for (const change of changes) {
@@ -33,6 +34,7 @@
   let seeked = false;
   let episodePanel;
   let lastPage;
+  let episodePage = false;
 
   function observe(root) {
     if (roots.has(root)) return false;
@@ -352,7 +354,7 @@
   }
 
   function reportPage(watching) {
-    const page = yummyAnime ? yummyAnimePage() : habster ? habsterPage() : {
+    let page = yummyAnime ? yummyAnimePage() : habster ? habsterPage() : legacyLibria ? {
       source: "AniLiberty",
       title: document.title.slice(0, 256),
       artwork: artwork(null, null, "AniLiberty"),
@@ -360,7 +362,21 @@
         YouTube: document.querySelector("#youtubeEpisodes select")?.value,
         RUTUBE: document.querySelector("#rutubeEpisodes select")?.value
       }
-    };
+    } : null;
+    if (episodePage) {
+      const source = document.querySelector('meta[property="og:site_name"]')?.content.trim();
+      const heading = document.querySelector("main h1")?.textContent.trim()
+        || document.querySelector('meta[property="og:title"]')?.content.trim() || document.title.trim();
+      const parts = heading.split(/\s+[|–—-]\s+/);
+      const site = source || location.hostname.split(".").at(-2);
+      const title = parts.length > 1 && parts.at(-1).toLowerCase() === site?.toLowerCase()
+        ? parts.slice(0, -1).join(" — ") : heading;
+      page = { ...page, episodePage: {
+        source: source?.slice(0, 48),
+        title: title.toLowerCase() !== site?.toLowerCase() ? title.slice(0, 256) : "",
+        artwork: artwork(null, null, "")
+      } };
+    }
     const signature = JSON.stringify(page);
     if (signature === lastPage) return;
     lastPage = signature;
@@ -373,7 +389,7 @@
     queued = undefined;
     const watching = token;
     if (!watching) return;
-    if (yummyAnime || habster || legacyLibria) reportPage(watching);
+    if (yummyAnime || habster || legacyLibria || episodePage) reportPage(watching);
     const choice = selected();
     const media = choice ? snapshot(choice) : null;
     const now = performance.now();
@@ -413,6 +429,8 @@
     token = undefined;
     lastReport = undefined;
     lastPage = undefined;
+    episodePage = false;
+    titleObserver?.disconnect();
     episodePanel = undefined;
     episodeObserver?.disconnect();
     sentAt = 0;
@@ -436,7 +454,12 @@
     if (message?.type !== "watch" || message.token === token) return;
     stop();
     token = message.token;
+    episodePage = topFrame && message.episodePage === true;
     observe(document);
+    if (episodePage && document.head) {
+      titleObserver.observe(document.head, { childList: true, subtree: true, characterData: true,
+        attributes: true, attributeFilter: ["content"] });
+    }
     addEventListener("resize", viewportChanged, { passive: true });
     addEventListener("scroll", viewportChanged, { passive: true, capture: true });
     document.addEventListener("fullscreenchange", schedule);

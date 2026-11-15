@@ -1,5 +1,5 @@
-import { allowedPage, bridgeAdvice, choosePlayback, defaultSettings, sampleLifetime,
-  toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
+import { allowedPage, bridgeAdvice, choosePlayback, defaultSettings, episodeFromUrl, sampleLifetime,
+  toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 let settings = defaultSettings;
@@ -33,7 +33,9 @@ async function attach(tab, frame) {
       files: ["media.js"]
     });
     if (watches.get(tab.id) !== tab || tab.documents.get(frame.frameId) !== frame.documentId) return;
-    await chrome.tabs.sendMessage(tab.id, { type: "watch", token: tab.token }, {
+    await chrome.tabs.sendMessage(tab.id, {
+      type: "watch", token: tab.token, episodePage: frame.frameId === 0 && Boolean(tab.episode)
+    }, {
       documentId: frame.documentId
     });
   } catch {
@@ -120,7 +122,9 @@ function preview() {
   const choice = choosePlayback(watches, selectedTabId, publishedTabId, Date.now());
   if (!choice) return null;
   const { tab, media, background } = choice;
-  const activity = toActivity(withPageMetadata(media, tab.pageMetadata), settings.image, background);
+  const custom = withPageMetadata(media, tab.pageMetadata);
+  const video = custom !== media ? custom : withEpisodePage(media, tab.episode, tab.pageMetadata?.episodePage);
+  const activity = toActivity(video, settings.image, background);
   return { activity, background, url: tab.url, tabId: tab.id };
 }
 
@@ -178,7 +182,8 @@ async function refresh(force = false) {
   for (const tab of eligible.values()) {
     let target = watches.get(tab.id);
     if (!target) {
-      target = { id: tab.id, url: tab.url, token: crypto.randomUUID(), documents: new Map(), samples: new Map() };
+      target = { id: tab.id, url: tab.url, token: crypto.randomUUID(), episode: episodeFromUrl(tab.url),
+        documents: new Map(), samples: new Map() };
       watches.set(tab.id, target);
       changed = true;
       void startTracking(target);
@@ -259,6 +264,9 @@ chrome.webNavigation.onCommitted.addListener(frame => {
   }
   if (tab.samples.delete(frame.frameId)) updatePresence();
   watchFrame(tab, frame);
+});
+chrome.webNavigation.onHistoryStateUpdated.addListener(frame => {
+  if (frame.frameId === 0 && (frame.tabId === selectedTabId || watches.has(frame.tabId))) scheduleRefresh(false);
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "local") scheduleRefresh(Boolean(changes.blockedHosts));

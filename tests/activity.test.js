@@ -1,10 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowedPage, bestMedia, bridgeAdvice, choosePlayback, defaultSettings,
-  toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
+import { allowedPage, bestMedia, bridgeAdvice, choosePlayback, defaultSettings, episodeFromUrl,
+  toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
 const normalDigits = value => value.detail.normalize("NFKC");
+
+test("reads the selected episode from playback routes on any host", () => {
+  const miruro = "https://barelystarted.miruro.tv/watch/DlRBmYglhr_EA9RijDFnuQ20sg5uNmkI/aoashi-season-2?ep=7";
+  const episode = episodeFromUrl(miruro);
+  assert.deepEqual(episode, { episode: "7", season: "2", title: "Aoashi", host: "barelystarted.miruro.tv" });
+  const video = { ...paused, title: "Player", source: "iframe.example.net", state: "playing" };
+  const merged = withEpisodePage(video, episode, { source: "Miruro", title: "Aoashi Season 2" });
+  const activity = toActivity(merged);
+  assert.equal(activity.title, "Miruro · Aoashi · S2 Ep.7");
+  assert.equal(activity.detail, toActivity(video).detail);
+  assert.equal(toActivity(withEpisodePage(video, episodeFromUrl(miruro.replace("ep=7", "ep=8")))).title,
+    "barelystarted.miruro.tv · Aoashi · S2 Ep.8");
+  assert.equal(watchLink(miruro + "&token=private#saved"), miruro);
+
+  const generic = "https://example.com/anime/watch/some-show/episode-12.5?season=3";
+  assert.equal(toActivity(withEpisodePage(video, episodeFromUrl(generic))).title, "example.com · Some Show · S3 Ep.12.5");
+  assert.equal(watchLink(generic), generic);
+  assert.equal(episodeFromUrl("https://example.com/anime/watch/123?episode=0&season=1").episode, "0");
+  assert.equal(episodeFromUrl("https://example.com/profile/podcasts?ep=7"), null);
+  assert.equal(episodeFromUrl("https://example.com/watch/some-show?ep=token"), null);
+  assert.equal(episodeFromUrl("https://example.com/watch/token?episodeId=123456"), null);
+  assert.equal(episodeFromUrl("https://www.youtube.com/watch?v=M7lc1UVf-VE&ep=7"), null);
+  assert.equal(watchLink("https://example.com/watch/token?ep=private"), "https://example.com/watch/token");
+  const audio = { ...video, audio: true };
+  assert.equal(withEpisodePage(audio, episode), audio);
+  assert.equal(withEpisodePage(null, episode), null);
+});
 
 test("maps Chrome native messaging failures to a setup step", () => {
   assert.match(bridgeAdvice("Specified native messaging host not found."), /Extract the Windows release ZIP/);

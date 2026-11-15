@@ -22,9 +22,9 @@ With Chrome 1.5.1 and VLC 1.1.3 or later, playing media in VLC takes priority ov
 
 ## Screenshots
 
-| Bilibili video | Twitch live stream |
+| Video | Live stream |
 | --- | --- |
-| ![Discord activity with a Bilibili video, thumbnail and time remaining](docs/screenshots/discord-bilibili.png) | ![Discord activity with a live Twitch stream and channel artwork](docs/screenshots/discord-twitch.png) |
+| ![Discord activity with a video, thumbnail and time remaining](docs/screenshots/discord-bilibili.png) | ![Discord activity with a live stream and channel artwork](docs/screenshots/discord-twitch.png) |
 
 ![WatchKit settings with Discord setup, website access, exclusions and keyboard shortcut](docs/screenshots/chrome-settings.png)
 
@@ -74,29 +74,19 @@ WatchKit detects accessible HTML video and audio, including players in frames th
 
 ### Music, podcasts and radio
 
-WatchKit uses **Listening** for YouTube Music, Apple Music and Podcasts, SoundCloud, Bandcamp, Deezer, TIDAL, Qobuz, Amazon Music, Yandex Music, VK Music, Mixcloud, Pocket Casts, Audible, TuneIn, BBC Sounds and other audio services. It can also recognize a standard HTML audio player on an unlisted site. Artist and artwork depend on the information exposed by the player.
-
-Spotify uses the [built-in Discord connection](https://support.discord.com/hc/en-us/articles/360000167212-Discord-Spotify-Connection). Link Spotify in **Discord Settings → Connections** and enable **Display Spotify as your status**.
+WatchKit uses **Listening** for audio playback. Artist and artwork depend on the information exposed by the player. See [player detection](docs/PLAYER-DETECTION.md) for services with built-in Discord integrations or custom metadata handling.
 
 ### Series and embedded players
 
-| Site and player | What WatchKit reads |
-| --- | --- |
-| AniLiberty archive (`anilibria.tv`, `anilibria.uno`) | The active PlayerJS episode, which also opens from the **Watch too** link. Reads the selected episode from the RUTUBE and YouTube lists when their embedded player is active. |
-| AniLiberty episode pages | Series title and episode number from the active episode page. |
-| YummyAnime with Kodik | Page title, selected episode and poster from YummyAnime. The card prefers an English title when available. |
-| Habster with Alloha | Series title and poster from Habster. Season and episode come from the current Alloha controls. |
-| Habster with Collaps | Series title and poster from Habster. Season and episode come from the title that Collaps updates on episode changes. |
-| VK Video and RUTUBE | The video title and artwork when the player or page exposes them. Episode numbers depend on the video title or player metadata. |
-| Other players | WatchKit reads the episode from explicit labels in the title or the selected episode control when available. It still shows playback time when the episode is unknown. |
+WatchKit recognizes explicit episode labels in titles, selected episode controls, and playback URLs such as `/watch/<id>/<title>?ep=7`. On these playback URLs, it combines the episode from the page with the timing from the active player, including an accessible embedded player. See the [detection rules and player adapters](docs/PLAYER-DETECTION.md).
 
 ## Data and previews
 
-**Watch too** and **Listen too** let people who see your Discord activity open its media page. To hide the link, turn off **Watch too / Listen too button** under **Settings → Discord** and click **Save settings**. WatchKit shares HTTPS links with recognized media identifiers, such as the YouTube video ID, Bilibili part number or AniLiberty episode. If the player keeps the episode selection inside its frame, viewers can select the episode on the page. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
+**Watch too** and **Listen too** let people who see your Discord activity open its media page. To hide the link, turn off **Watch too / Listen too button** under **Settings → Discord** and click **Save settings**. WatchKit keeps recognized media identifiers and episode numbers in HTTPS links. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
 
 The extension saves your Discord application ID, artwork key, sharing preferences, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets it follow page changes in tabs it is tracking.
 
-WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. For supported YouTube and Bilibili previews, Discord receives a wsrv.nl image URL with the original public thumbnail URL as a parameter. wsrv.nl fits the full image into a square with black padding as needed. Other previews use their original URL. WatchKit skips external artwork URLs that contain query strings, which can carry session or access tokens. If it finds no usable URL, it uses your optional fallback artwork key.
+WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. Some public thumbnails are fitted into a square by an image resizing service. WatchKit skips external artwork URLs that contain query strings, which can carry session or access tokens. If it finds no usable URL, it uses your optional fallback artwork key. [Artwork examples and resizing](docs/PLAYER-DETECTION.md#artwork)
 
 ## Update or remove
 
