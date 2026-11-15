@@ -228,16 +228,44 @@
     candidates.push(video?.poster, youtubeThumbnail,
       ...Array.from(pageImages, entry => entry.content || entry.getAttribute("href")));
     for (const candidate of candidates) {
-      if (!candidate) continue;
-      try {
-        const url = new URL(candidate, document.baseURI);
-        if (url.protocol === "https:" && !url.username && !url.password
-            && !url.search && !url.hash && url.href.length <= 512) return url.href;
-      } catch {
-        // Ignore malformed artwork URLs.
-      }
+      const url = publicArtwork(candidate);
+      if (url) return url;
     }
     return "";
+  }
+
+  function publicArtwork(candidate) {
+    if (!candidate) return "";
+    try {
+      const url = new URL(candidate, document.baseURI);
+      if (url.protocol === "https:" && !url.username && !url.password
+          && !url.search && !url.hash && url.href.length <= 512) return url.href;
+    } catch {
+      // Ignore malformed artwork URLs.
+    }
+    return "";
+  }
+
+  function episodeCover() {
+    const path = location.pathname.replace(/\/$/, "");
+    const segments = path.split("/").filter(Boolean);
+    const detailsPath = /^\/(?:anime\/)?(?:info|details|title|show|series)(?=\/)/i;
+    for (const image of document.querySelectorAll("img[data-cover-target], a[href] img")) {
+      const target = image.getAttribute("data-cover-target");
+      const link = image.closest("a[href]");
+      const related = link?.origin === location.origin && detailsPath.test(link.pathname)
+        && path.endsWith(link.pathname.replace(detailsPath, "").replace(/\/$/, ""));
+      const cover = segments.includes(target)
+        || (related && image.naturalHeight > 0 && image.naturalWidth <= image.naturalHeight);
+      if (!cover || (image.complete && !image.naturalWidth)) continue;
+      const url = publicArtwork(image.currentSrc) || publicArtwork(image.getAttribute("src"));
+      if (url) return url;
+    }
+    return "";
+  }
+
+  function coverLoaded(event) {
+    if (event.target?.matches?.("img[data-cover-target], a[href] img")) schedule();
   }
 
   function snapshot({ video, state, score }) {
@@ -374,7 +402,7 @@
       page = { ...page, episodePage: {
         source: source?.slice(0, 48),
         title: title.toLowerCase() !== site?.toLowerCase() ? title.slice(0, 256) : "",
-        artwork: artwork(null, null, "")
+        artwork: episodeCover() || artwork(null, null, "")
       } };
     }
     const signature = JSON.stringify(page);
@@ -446,6 +474,7 @@
     document.removeEventListener("fullscreenchange", schedule);
     document.removeEventListener("visibilitychange", schedule);
     document.removeEventListener("change", schedule);
+    document.removeEventListener("load", coverLoaded, true);
     removeEventListener("pagehide", stop);
   }
 
@@ -459,6 +488,7 @@
     if (episodePage && document.head) {
       titleObserver.observe(document.head, { childList: true, subtree: true, characterData: true,
         attributes: true, attributeFilter: ["content"] });
+      document.addEventListener("load", coverLoaded, true);
     }
     addEventListener("resize", viewportChanged, { passive: true });
     addEventListener("scroll", viewportChanged, { passive: true, capture: true });

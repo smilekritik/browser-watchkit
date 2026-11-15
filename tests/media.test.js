@@ -7,7 +7,7 @@ import { toActivity } from "../extension/activity.js";
 const mediaScript = readFileSync(new URL("../extension/media.js", import.meta.url), "utf8");
 
 function track(url, { title = "", selectors = {}, images = [], top = false, media = {}, metadata,
-  audio = false, player = null } = {}) {
+  audio = false, player = null, episodePage = false, covers = [], pageMetadata = false } = {}) {
   const watchWindow = {};
   watchWindow.top = top ? watchWindow : {};
   const sent = [];
@@ -38,7 +38,7 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
     },
     querySelector: selector => selectors[selector],
     getElementById: id => selectors[`#${id}`],
-    querySelectorAll: () => images,
+    querySelectorAll: selector => selector === "img[data-cover-target], a[href] img" ? covers : images,
     addEventListener() {},
     removeEventListener() {}
   };
@@ -55,9 +55,31 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
       sendMessage: async message => { sent.push(message); return { watching: true }; }
     } }
   });
-  onMessage({ type: "watch", token: "test" });
+  onMessage({ type: "watch", token: "test", episodePage });
+  if (pageMetadata) return sent.find(message => message.type === "page-metadata")?.page.episodePage;
   return sent.find(message => message.type === "media").media;
 }
+
+test("prefers the current show's cover over generic metadata and other titles", () => {
+  const url = "https://example.com/watch/current-id/aoashi-season-2?ep=7";
+  const cover = "https://cdn.example.com/aoashi.jpg";
+  const fallback = "https://example.com/icon-output.png";
+  const poster = (src, target, link, naturalWidth = 460) => ({
+    naturalWidth, naturalHeight: 650, complete: true,
+    currentSrc: src, closest: () => link,
+    getAttribute: name => name === "data-cover-target" ? target : src
+  });
+  const opts = { top: true, episodePage: true, pageMetadata: true, images: [{ content: fallback }] };
+  const another = poster("https://cdn.example.com/another.jpg", "another-id",
+    new URL("/info/another-id/another-show", url));
+  const linked = new URL("/info/current-id/aoashi-season-2", url);
+  assert.equal(track(url, { ...opts, covers: [another, poster(cover, "current-id")] }).artwork, cover);
+  assert.equal(track(url, { ...opts, covers: [
+    another, poster("https://cdn.example.com/banner.jpg", null, linked, 1600), poster(cover, null, linked)
+  ] }).artwork, cover);
+  assert.equal(track(url, { ...opts, covers: [another, poster(cover + "?token=private", "current-id")] }).artwork, fallback);
+  assert.equal(track(url, { ...opts, covers: [another, poster(cover, "current-id", null, 0)] }).artwork, fallback);
+});
 
 test("reads Alloha's selected controls and Collaps's current episode title", () => {
   const alloha = track("https://befriend.stravers.live/", { selectors: {

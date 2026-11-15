@@ -23,4 +23,6 @@ The audio service list in [media.js](../extension/media.js) also helps identify 
 
 ## Artwork
 
+On an episode page, WatchKit prefers a poster associated with the current title by its cover identifier or by a matching details link. This works with layouts that publish a site logo or a banner in their global preview tags, including Miruro. Other page previews and embedded-player artwork remain available as fallbacks.
+
 WatchKit sends recognized public YouTube and Bilibili thumbnail URLs to `wsrv.nl` to fit them into a square with padding. It sends other accepted artwork URLs directly to Discord. Player artwork and page previews must be public HTTPS URLs without query strings.
