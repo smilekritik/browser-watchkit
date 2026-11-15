@@ -1,4 +1,4 @@
-import { allowedPage, bestMedia, defaultSettings, toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
+import { allowedPage, bestMedia, bridgeAdvice, defaultSettings, toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 let settings = defaultSettings;
@@ -8,6 +8,8 @@ let selectedTabId;
 let revision = 0;
 let bridge = null;
 let connection = "idle";
+let connectionHint = "";
+let connectingSince = 0;
 let retryAt = 0;
 let lastPacket = "";
 let expiry;
@@ -50,6 +52,7 @@ function clearPresence() {
   lastPacket = "";
   retryAt = 0;
   connection = "idle";
+  connectionHint = "";
   if (port) {
     try {
       port.postMessage({ type: "clear" });
@@ -69,6 +72,8 @@ function publish(activity) {
     const port = chrome.runtime.connectNative(hostName);
     bridge = port;
     connection = "connecting";
+    connectionHint = "";
+    connectingSince = Date.now();
     port.onMessage.addListener(message => {
       if (port !== bridge) return;
       if (message.type === "accepted") connection = "published";
@@ -80,7 +85,8 @@ function publish(activity) {
       bridge = null;
       lastPacket = "";
       retryAt = Date.now() + 15_000;
-      connection = error ? "unavailable" : "idle";
+      connection = "unavailable";
+      connectionHint = bridgeAdvice(error);
     });
   }
   const { linkEpisode, ...presence } = activity;
@@ -98,6 +104,7 @@ function publish(activity) {
     lastPacket = "";
     retryAt = Date.now() + 15_000;
     connection = "unavailable";
+    connectionHint = bridgeAdvice();
   }
 }
 
@@ -208,7 +215,8 @@ chrome.permissions.onAdded.addListener(() => scheduleRefresh(true));
 chrome.permissions.onRemoved.addListener(() => scheduleRefresh(true));
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type === "status" && sender.url === chrome.runtime.getURL("popup.html")) {
-    reply({ connection, activity: preview() });
+    const waiting = connection === "connecting" && Date.now() - connectingSince >= 5000;
+    reply({ connection: waiting ? "waiting" : connection, connectionHint, activity: preview() });
     return;
   }
   if (!["media", "page-metadata"].includes(message?.type)) return;

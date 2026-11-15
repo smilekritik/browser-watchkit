@@ -19,9 +19,10 @@ enabled.onchange = () => chrome.storage.local.set({ enabled: enabled.checked });
 const stateText = {
   idle: "Waiting for playback",
   connecting: "Connecting to Discord…",
+  waiting: "Waiting for the Discord desktop app",
   published: "Sharing on Discord",
   rejected: "Discord rejected the activity",
-  unavailable: "Native bridge unavailable"
+  unavailable: "WatchKit bridge could not start"
 };
 
 async function refresh() {
@@ -32,24 +33,37 @@ async function refresh() {
   ]);
   const excludedBy = matchingHost(host, config.blockedHosts);
   const pausedBy = matchingHost(host, paused);
+  const granted = origin && await chrome.permissions.contains({ origins: [origin] });
+  const spotify = isSpotify(host);
+  const canTrack = validId(config.applicationId) && config.enabled && currentRule && granted
+    && !spotify && !excludedBy && !pausedBy;
   enabled.checked = config.enabled;
   byId("setup-row").hidden = validId(config.applicationId);
   byId("status").textContent = !validId(config.applicationId) ? "Connect Discord to get started"
     : !config.enabled ? "Sharing is off"
-    : isSpotify(host) ? "Spotify uses Discord’s own connection"
+    : spotify ? "Spotify uses Discord’s own connection"
     : excludedBy ? "This site is excluded"
     : pausedBy ? "This site is paused"
+    : !currentRule ? "Open a tab with music or video"
+    : !granted ? "Allow this site to start tracking"
     : stateText[reply?.connection] ?? stateText.idle;
+  const help = byId("connection-help");
+  help.textContent = canTrack ? ({
+    waiting: "Open Discord desktop and sign in. If it is already open, check the Application ID in WatchKit settings.",
+    rejected: "Copy the Application ID from General Information in the Discord Developer Portal, then save it in WatchKit settings.",
+    unavailable: reply?.connectionHint,
+    idle: "Start playback in this tab. If the player is embedded from another site, allow its domain in Chrome."
+  }[reply?.connection ?? "idle"] ?? "") : "";
+  help.hidden = !help.textContent;
   byId("video").textContent = reply?.activity?.title ?? "";
   byId("timing").textContent = reply?.activity?.detail ?? "";
   if (!currentRule) return;
-  if (isSpotify(host)) {
+  if (spotify) {
     byId("site-state").textContent = "Spotify is handled by Discord";
     for (const control of [allow, byId("pause-site"), byId("block-site"), byId("resume-site")]) control.hidden = true;
     return;
   }
 
-  const granted = await chrome.permissions.contains({ origins: [origin] });
   byId("site-state").textContent = excludedBy ? `Excluded by ${excludedBy}`
     : pausedBy ? "Paused until Chrome restarts"
     : granted ? "Access allowed" : "Site access needed";

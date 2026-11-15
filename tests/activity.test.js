@@ -1,9 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowedPage, bestMedia, toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
+import { allowedPage, bestMedia, bridgeAdvice, toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
 const normalDigits = value => value.detail.normalize("NFKC");
+
+test("maps Chrome native messaging failures to a setup step", () => {
+  assert.match(bridgeAdvice("Specified native messaging host not found."), /Extract the Windows release ZIP/);
+  assert.match(bridgeAdvice("Access to the specified native messaging host is forbidden."), /chrome:\/\/extensions/);
+  assert.match(bridgeAdvice("Native host has exited."), /exit Chrome completely/);
+});
 
 test("shares a video page without credentials, fragments or unrelated parameters", () => {
   assert.equal(watchLink("https://www.youtube.com/watch?v=M7lc1UVf-VE&token=private#part"),

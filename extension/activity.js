@@ -10,6 +10,16 @@ export function validId(value) {
   return typeof value === "string" && /^\d{16,20}$/.test(value);
 }
 
+export function bridgeAdvice(error) {
+  if (/host.*not found|specified native messaging host.*not registered/i.test(error ?? "")) {
+    return "Extract the Windows release ZIP and run Install WatchKit.bat under your Chrome account.";
+  }
+  if (/access.*forbidden|not allowed|disabled by.*policy/i.test(error ?? "")) {
+    return "Run Install WatchKit.bat again and reload WatchKit at chrome://extensions. If Chrome is managed, check its native messaging policy.";
+  }
+  return "Turn off sharing, exit Chrome completely, and rerun Install WatchKit.bat from the latest Windows release ZIP.";
+}
+
 export function watchLink(value, linkEpisode) {
   let page;
   try {

@@ -32,7 +32,7 @@ You need Windows 10 or 11 x64, Chrome 119 or later, and the [Discord desktop app
 
 1. Under **Assets** on the release page, download `WatchKit-Chrome-…-win-x64.zip`. The **Source code** archives require a build. [Download page](https://github.com/smilekritik/browser-watchkit/releases/latest)
 2. Right-click the ZIP in File Explorer, choose **Extract All**, and open the extracted folder. Keep this folder after installation because Chrome loads the extension from it.
-3. Double-click **Install WatchKit.bat** under the Windows account you use for Chrome. It runs the bridge installer using Windows PowerShell. You can run it as a regular user without opening a terminal or installing PowerShell 7. Look for `Browser WatchKit bridge registered for your Windows account.` before closing the window.
+3. Double-click **Install WatchKit.bat** under the Windows account you use for Chrome. Setup uses Windows PowerShell and runs as a regular user. When the bridge is registered, the window prints the exact folder to load in Chrome.
 4. Paste `chrome://extensions` into Chrome's address bar. Turn on **Developer mode**, click **Load unpacked**, and select the `extension` folder inside the extracted folder. Choose the folder that contains `manifest.json`.
 5. Open Chrome's **Extensions** menu and pin **WatchKit**. Continue with the Discord setup below.
 
@@ -107,9 +107,10 @@ To remove it, close Chrome, unblock and run `./scripts/uninstall.ps1` from the r
 | --- | --- |
 | Installer says to download the release ZIP | Check for `build/browser-watchkit-host.exe` next to the `extension` and `scripts` folders. Extract the Windows x64 ZIP from **Assets** before running the installer. |
 | PowerShell reports a missing `LiteralPath` or a doubled path | Double-click **Install WatchKit.bat** in the extracted folder. |
-| **Native bridge unavailable** | Rerun **Install WatchKit.bat** using the same Windows account as Chrome. Look for the registration message, then reload WatchKit in `chrome://extensions`. If it still fails, note the extension ID and any error from the WatchKit card. The release extension ID is `eohflcpmoebbejkcihlbmnakgoolhmdn`. For a custom build with a different ID, run `.\scripts\install.ps1 -ExtensionId YOUR_EXTENSION_ID`. |
-| **Waiting for video** | Play the video in the selected Chrome tab and check its site permissions and exclusions. For a player embedded from another domain, grant **Allow all websites**, then refresh the tab. |
-| **Discord rejected the activity** or no Discord card | Check that Discord desktop is open and signed in, that activity sharing is enabled in Discord, and that you saved the **Application ID** from **General Information**. |
+| **WatchKit bridge could not start** | Rerun **Install WatchKit.bat** using the same Windows account as Chrome, then reload WatchKit in `chrome://extensions`. For a custom build with a different extension ID, run `.\scripts\install.ps1 -ExtensionId YOUR_EXTENSION_ID`. |
+| **Waiting for playback** | Play the media in the selected Chrome tab and check its site permissions and exclusions. For a player embedded from another domain, grant access to that domain, then refresh the tab. |
+| **Waiting for the Discord desktop app** | Open Discord desktop and sign in. If Discord is already open, check the **Application ID** in WatchKit settings. |
+| **Discord rejected the activity** or no Discord card | Copy the **Application ID** from **General Information** in the Discord Developer Portal, save it in WatchKit, and check Discord's activity privacy settings. |
 | The card shows only a player name or misses the episode | Record the page URL and the selected player's name. A site can offer multiple players and each can expose title, season, and episode data differently. |
 | The card shows a question mark or the wrong artwork | Under **Settings → Discord**, clear the fallback artwork field or enter an asset key that exists in the same Discord application, then save. A site can provide a preview URL that Discord cannot load, for example when it requires a signed-in browser. |
 

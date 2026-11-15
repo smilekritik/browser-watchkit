@@ -1,4 +1,4 @@
-import { browserArtworkKey, defaultSettings, siteRule, validId } from "./activity.js";
+import { bridgeAdvice, browserArtworkKey, defaultSettings, siteRule, validId } from "./activity.js";
 import { allWeb, byId, getRules, setRule } from "./preferences.js";
 
 const application = byId("application");
@@ -21,9 +21,15 @@ byId("show-id").onclick = event => {
 
 byId("config").onsubmit = async event => {
   event.preventDefault();
+  const applicationId = application.value.trim();
+  if (applicationId && !validId(applicationId)) {
+    discordNotice.textContent = "Copy the 16–20 digit Application ID from General Information in the Discord Developer Portal.";
+    application.focus();
+    return;
+  }
   try {
     image.value = browserArtworkKey(image.value);
-    await chrome.storage.local.set({ applicationId: application.value.trim(), image: image.value, shareLink: shareLink.checked });
+    await chrome.storage.local.set({ applicationId, image: image.value, shareLink: shareLink.checked });
     discordNotice.textContent = "Settings saved.";
   } catch {
     discordNotice.textContent = "Could not save Discord settings.";
@@ -40,8 +46,8 @@ byId("import-vlc").onclick = async () => {
     await chrome.storage.local.set({ applicationId: config.applicationId });
     application.value = config.applicationId;
     discordNotice.textContent = "Application ID imported.";
-  } catch {
-    discordNotice.textContent = "Install the WatchKit bridge to import a saved ID.";
+  } catch (error) {
+    discordNotice.textContent = bridgeAdvice(error.message);
   }
 };
 
