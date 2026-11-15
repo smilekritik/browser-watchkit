@@ -129,19 +129,37 @@
 
   function artwork(video, metadata, source) {
     if (location.protocol === "file:") return "";
+    let youtubeThumbnail;
     if (source === "YouTube") {
       const page = new URL(location.href);
       const id = page.hostname === "youtu.be" ? page.pathname.slice(1)
         : page.searchParams.get("v") || /^\/(?:shorts|embed|live)\/([^/]+)/.exec(page.pathname)?.[1];
-      if (/^[A-Za-z0-9_-]{11}$/.test(id ?? "")) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+      if (/^[A-Za-z0-9_-]{11}$/.test(id ?? "")) {
+        youtubeThumbnail = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        if (!youtubeMusic) return youtubeThumbnail;
+      }
     }
     const pageImages = document.querySelectorAll([
       'meta[property="og:image:secure_url"]', 'meta[property="og:image"]', 'meta[property="og:image:url"]',
       'meta[name="twitter:image"]', 'meta[name="twitter:image:src"]',
       'meta[itemprop="thumbnailUrl"]', 'link[itemprop="thumbnailUrl"]', 'link[rel="image_src"]'
     ].join(", "));
-    const candidates = [...(metadata?.artwork ?? []).map(entry => entry.src).reverse(),
-      video?.poster, ...Array.from(pageImages, entry => entry.content || entry.getAttribute("href"))];
+    const sessionImages = metadata?.artwork ?? [];
+    const candidates = sessionImages.map(entry => entry.src).reverse();
+    if (youtubeMusic) {
+      const squareCovers = sessionImages.flatMap(({ src, sizes }) =>
+        (sizes ?? "").split(/\s+/).flatMap(size => {
+          const square = /^([1-9]\d*)x\1$/i.exec(size);
+          return square ? [{ src, width: Number(square[1]) }] : [];
+        })
+      ).sort((a, b) => b.width - a.width);
+      const cover = document.querySelector("ytmusic-player-bar .thumbnail-image img, ytmusic-player-bar img.image");
+      const squareCover = cover?.naturalWidth > 0 && cover.naturalWidth === cover.naturalHeight
+        ? cover.currentSrc || cover.src : undefined;
+      candidates.unshift(...squareCovers.map(entry => entry.src), squareCover);
+    }
+    candidates.push(video?.poster, youtubeThumbnail,
+      ...Array.from(pageImages, entry => entry.content || entry.getAttribute("href")));
     for (const candidate of candidates) {
       if (!candidate) continue;
       try {

@@ -6,7 +6,7 @@ import { toActivity } from "../extension/activity.js";
 
 const mediaScript = readFileSync(new URL("../extension/media.js", import.meta.url), "utf8");
 
-function track(url, { title = "", selectors = {}, images = [], top = false, media = {} } = {}) {
+function track(url, { title = "", selectors = {}, images = [], top = false, media = {}, metadata } = {}) {
   const watchWindow = {};
   watchWindow.top = top ? watchWindow : {};
   const sent = [];
@@ -39,7 +39,7 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
   };
   runInNewContext(mediaScript, {
     URL, document, window: watchWindow, location: new URL(url),
-    navigator: {}, performance: { now: () => 0 }, innerWidth: 640, innerHeight: 360,
+    navigator: { mediaSession: { metadata } }, performance: { now: () => 0 }, innerWidth: 640, innerHeight: 360,
     Node: { ELEMENT_NODE: 1, DOCUMENT_NODE: 9, DOCUMENT_FRAGMENT_NODE: 11 },
     NodeFilter: { SHOW_ELEMENT: 1 }, HTMLVideoElement: video.constructor,
     MutationObserver: class { observe() {} disconnect() {} },
@@ -64,6 +64,18 @@ test("reads Alloha's selected controls and Collaps's current episode title", () 
   const collaps = track("https://api.initem.ws/embed/kp/4541515", { title: "Укрытие (3 сезон) - 10 серия" });
   assert.equal(collaps.season, "3");
   assert.equal(collaps.episode, "10");
+});
+
+test("uses the largest square YouTube Music cover without adding padding", () => {
+  const url = "https://music.youtube.com/watch?v=J63aZNuoRek";
+  const cover = "https://lh3.googleusercontent.com/album=w512-h512";
+  const sample = track(url, { top: true, metadata: { artwork: [
+    { src: cover, sizes: "512x512" },
+    { src: "https://lh3.googleusercontent.com/album=w120-h120", sizes: "120x120" },
+    { src: "https://i.ytimg.com/vi/J63aZNuoRek/hqdefault.jpg", sizes: "480x360" },
+  ] } });
+  assert.equal(toActivity(sample).image, cover);
+  assert.equal(track(url, { top: true }).artwork, "https://i.ytimg.com/vi/J63aZNuoRek/hqdefault.jpg");
 });
 
 test("uses the YouTube Music player clock for position, duration and time left", () => {
