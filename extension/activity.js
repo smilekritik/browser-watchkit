@@ -186,6 +186,7 @@ export function toActivity(media, image = "", background = false) {
   if (media.source) title = `${media.source} · ${title}`;
   return {
     activityType: audio || background ? 2 : 3,
+    paused: media.state === "paused",
     linkEpisode: media.linkEpisode,
     title: `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}${media.state === "paused" ? " · ⏸\ufe0e" : ""}`,
     detail: detail.replace(/\d/g, digit => String.fromCodePoint(0x1d7f6 + Number(digit))),

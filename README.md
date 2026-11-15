@@ -18,6 +18,8 @@ WatchKit follows playback in Chrome, including music or video with sound in back
 
 Use the same Discord application in both editions. Enter the same **Application ID** in Chrome and VLC to publish playback under one name on your Discord profile. You only need to create the application once. [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
 
+With Chrome 1.5.1 and VLC 1.1.3 or later, playing media in VLC takes priority over Chrome. Playing browser media takes over when VLC pauses or stops, including playback from an allowed background tab. If both have paused media, VLC keeps the card. Update the Windows bridge as well as the extension when upgrading to 1.5.1.
+
 ## Screenshots
 
 | Bilibili video | Twitch live stream |

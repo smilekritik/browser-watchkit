@@ -81,6 +81,11 @@ function publish(view) {
       if (port !== bridge) return;
       if (message.type === "accepted") connection = "published";
       if (message.type === "rejected") connection = "rejected";
+      if (message.type === "yielded-to-vlc") connection = "vlc";
+      if (message.type === "resuming") {
+        connection = "connecting";
+        connectingSince = Date.now();
+      }
     });
     port.onDisconnect.addListener(() => {
       const error = chrome.runtime.lastError?.message;

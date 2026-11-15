@@ -98,6 +98,7 @@ int main()
 
     const HANDLE events[] = {input, discord.event()};
     std::string active_id;
+    bool yielding = false;
     while (true) {
         const auto result = WaitForMultipleObjects(2, events, FALSE, wait_time(discord));
         if (result == WAIT_OBJECT_0) {
@@ -121,16 +122,23 @@ int main()
                     active_id = id;
                     const auto kind = message.find("activityType");
                     const bool listening = kind != message.end() && kind->is_number_integer() && *kind == 2;
+                    const auto pause = message.find("paused");
+                    const bool paused = pause != message.end() && pause->is_boolean()
+                        ? pause->get<bool>() : title.ends_with("\xE2\x8F\xB8\xEF\xB8\x8E");
                     discord.update(std::move(id), addon::Activity{
                         std::move(title), string_field(message, "detail"), string_field(message, "image"),
                         string_field(message, "watchUrl"), listening ? 2 : 3
-                    });
+                    }, paused);
                 }
             }
         }
         discord.pump();
-        if (discord.take_acknowledgement()) report("accepted");
-        if (discord.take_rejection()) report("rejected");
+        if (yielding != discord.yielding()) {
+            yielding = discord.yielding();
+            report(yielding ? "yielded-to-vlc" : "resuming");
+        }
+        if (discord.take_acknowledgement() && !yielding) report("accepted");
+        if (discord.take_rejection() && !yielding) report("rejected");
     }
     discord.update(active_id, std::nullopt);
     reader.join();

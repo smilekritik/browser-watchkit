@@ -131,7 +131,9 @@ test("uses Listening for background video and for music on any tab", () => {
   assert.equal(toActivity(media).activityType, 3);
   const activity = toActivity(media, "", true);
   assert.equal(activity.activityType, 2);
+  assert.equal(activity.paused, false);
   assert.equal(activity.title, "Show · S2 Ep.3");
+  assert.equal(toActivity({ ...media, state: "paused" }).paused, true);
   for (const background of [false, true]) {
     assert.equal(toActivity({ ...media, audio: true }, "", background).activityType, 2);
   }

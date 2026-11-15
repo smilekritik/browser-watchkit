@@ -21,6 +21,7 @@ const stateText = {
   connecting: "Connecting to Discord…",
   waiting: "Waiting for the Discord desktop app",
   published: "Sharing on Discord",
+  vlc: "VLC has priority",
   rejected: "Discord rejected the activity",
   unavailable: "WatchKit bridge could not start"
 };
@@ -36,6 +37,7 @@ async function refresh() {
   const granted = origin && await chrome.permissions.contains({ origins: [origin] });
   const spotify = isSpotify(host);
   const background = Boolean(reply?.background && reply.activity);
+  const vlc = reply?.connection === "vlc";
   const canTrack = background || (validId(config.applicationId) && config.enabled && currentRule && granted
     && !spotify && !excludedBy && !pausedBy);
   enabled.checked = config.enabled;
@@ -54,12 +56,13 @@ async function refresh() {
     waiting: "Open Discord desktop and sign in. If it is already open, check the Application ID in WatchKit settings.",
     rejected: "Copy the Application ID from General Information in the Discord Developer Portal, then save it in WatchKit settings.",
     unavailable: reply?.connectionHint,
+    vlc: "Playing browser media can take over when VLC pauses or stops.",
     idle: "Start playback in this tab. If the player is embedded from another site, allow its domain in Chrome."
   }[reply?.connection ?? "idle"] ?? "") : "";
   help.hidden = !help.textContent;
-  byId("playback-origin").hidden = !background;
-  byId("video").textContent = reply?.activity?.title ?? "";
-  byId("timing").textContent = reply?.activity?.detail ?? "";
+  byId("playback-origin").hidden = !background || vlc;
+  byId("video").textContent = vlc ? "" : reply?.activity?.title ?? "";
+  byId("timing").textContent = vlc ? "" : reply?.activity?.detail ?? "";
   if (!currentRule) return;
   if (spotify) {
     byId("site-state").textContent = "Spotify is handled by Discord";
