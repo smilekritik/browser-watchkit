@@ -10,6 +10,10 @@ test("shares a video page without credentials, fragments or unrelated parameters
     "https://www.youtube.com/watch?v=M7lc1UVf-VE");
   assert.equal(watchLink("https://www.bilibili.com/video/BV123?p=2&from=home"), "https://www.bilibili.com/video/BV123?p=2");
   assert.equal(watchLink("https://habster.sbs/series/4541515/?utm_referrer=search"), "https://habster.sbs/series/4541515/");
+  assert.equal(watchLink("https://www.anilibria.tv/release/hotaru-no-yomeiri.html?token=private#play-s1", "3"),
+    "https://www.anilibria.tv/release/hotaru-no-yomeiri.html#play-s3");
+  assert.equal(watchLink("https://www.anilibria.tv/release/hotaru-no-yomeiri.html#secret", "1?token"),
+    "https://www.anilibria.tv/release/hotaru-no-yomeiri.html");
   for (const url of ["file:///C:/example.mp4", "https://localhost/video", "https://192.168.1.2/video",
     "https://user:pass@youtube.com/watch?v=M7lc1UVf-VE", "https://youtube.com/watch?token=private",
     `https://habster.sbs/${"a".repeat(512)}`]) {
@@ -67,6 +71,16 @@ test("formats explicit season and episode labels on any service", () => {
     assert.equal(toActivity({ ...paused, title, state: "playing", source: "VK Video" }).title,
       "VK Video · Silo · S3 Ep.10");
   }
+  assert.equal(toActivity({ ...paused, title: "Silo — 10 серия", state: "playing" }).title, "Silo · Ep.10");
+  assert.match(toActivity({ ...paused, title: "Long title ".repeat(30), episode: "10" }).title, /Ep\.10/);
+});
+
+test("uses only the corresponding external player episode on an AniLiberty release", () => {
+  const page = { source: "AniLiberty", title: "Hotaru no Yomeiri", episodes: { YouTube: "3", RUTUBE: "5" } };
+  const player = { ...paused, source: "YouTube", state: "playing" };
+  assert.equal(toActivity(withPageMetadata(player, page)).title, "AniLiberty · Hotaru no Yomeiri · Ep.3");
+  assert.equal(withPageMetadata({ ...player, source: "RUTUBE" }, page).episode, "5");
+  assert.equal(withPageMetadata({ ...player, source: "Vimeo" }, page).source, "Vimeo");
 });
 
 test("formats WatchKit timing at the actual playback speed", () => {
@@ -107,6 +121,9 @@ test("ignores stale frames and selects the strongest candidate", () => {
 test("filters excluded and restricted pages and validates the Discord ID", () => {
   assert.equal(allowedPage("https://example.test/video", []), true);
   assert.equal(allowedPage("https://example.test/video", ["example.test"]), false);
+  assert.equal(allowedPage("https://open.spotify.com/track/example", []), false);
+  assert.equal(allowedPage("https://open.spotify.com./embed/track/example", []), false);
+  assert.equal(allowedPage("https://spotify.com.example.test/video", []), true);
   assert.equal(allowedPage("chrome://settings", []), false);
   assert.equal(allowedPage("file:///C:/sample.webm", ["file:"]), false);
   assert.equal(validId("123456789012345678"), true);

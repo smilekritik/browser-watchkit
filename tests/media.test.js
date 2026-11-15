@@ -6,12 +6,13 @@ import { toActivity } from "../extension/activity.js";
 
 const mediaScript = readFileSync(new URL("../extension/media.js", import.meta.url), "utf8");
 
-function track(url, { title = "", selectors = {}, images = [], top = false, media = {}, metadata } = {}) {
+function track(url, { title = "", selectors = {}, images = [], top = false, media = {}, metadata,
+  audio = false, player = null } = {}) {
   const watchWindow = {};
   watchWindow.top = top ? watchWindow : {};
   const sent = [];
   let onMessage;
-  const video = new class Video {
+  class Media {
     isConnected = true;
     currentTime = 20;
     duration = 1400;
@@ -20,8 +21,11 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
     addEventListener() {}
     removeEventListener() {}
     getAttribute() { return null; }
+    closest(selector) { return selector === "#anilibriaPlayer" ? player : null; }
     getBoundingClientRect() { return { left: 0, top: 0, right: 640, bottom: 360 }; }
-  }();
+  }
+  class Audio extends Media {}
+  const video = audio ? new Audio() : new Media();
   Object.assign(video, media);
   const document = {
     title,
@@ -33,6 +37,7 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
       return { nextNode() { const element = next; next = null; return element; } };
     },
     querySelector: selector => selectors[selector],
+    getElementById: id => selectors[`#${id}`],
     querySelectorAll: () => images,
     addEventListener() {},
     removeEventListener() {}
@@ -41,7 +46,7 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
     URL, document, window: watchWindow, location: new URL(url),
     navigator: { mediaSession: { metadata } }, performance: { now: () => 0 }, innerWidth: 640, innerHeight: 360,
     Node: { ELEMENT_NODE: 1, DOCUMENT_NODE: 9, DOCUMENT_FRAGMENT_NODE: 11 },
-    NodeFilter: { SHOW_ELEMENT: 1 }, HTMLVideoElement: video.constructor,
+    NodeFilter: { SHOW_ELEMENT: 1 }, HTMLMediaElement: Media, HTMLAudioElement: Audio,
     MutationObserver: class { observe() {} disconnect() {} },
     getComputedStyle: () => ({ visibility: "visible" }),
     addEventListener() {}, removeEventListener() {}, setTimeout() {}, clearTimeout() {},
@@ -85,10 +90,49 @@ test("uses the YouTube Music player clock for position, duration and time left",
     "ytmusic-player-bar .time-info": { textContent: " 0:37 / 3:30 " }
   } });
   assert.equal(sample.source, "YouTube Music");
+  assert.equal(toActivity(sample).activityType, 2);
   assert.equal(sample.position, 37);
   assert.equal(sample.duration, 210);
   assert.equal(toActivity(sample).detail.normalize("NFKC"), "00:37 / 03:30 · 1.00× · 02:53 left");
   assert.equal(track(url, { top: true, media }).duration, 302);
+});
+
+test("publishes audio providers and native audio players as Listening", () => {
+  for (const [url, source] of [
+    ["https://music.apple.com/us/album/test/123", "Apple Music"],
+    ["https://play.pocketcasts.com/podcasts", "Pocket Casts"],
+    ["https://w.soundcloud.com/player/", "SoundCloud"],
+    ["https://artist.bandcamp.com/track/song", "Bandcamp"],
+    ["https://music.yandex.ru/album/123", "Яндекс Музыка"],
+    ["https://www.bbc.com/sounds/play/test", "BBC Sounds"]
+  ]) {
+    const sample = track(url, { top: true, media: {
+      getBoundingClientRect: () => ({ left: 0, right: 0, top: 0, bottom: 0 })
+    }, metadata: { title: "S1E3", artist: "The Artist" } });
+    assert.equal(toActivity(sample).activityType, 2, url);
+    assert.equal(toActivity(sample).title, `${source} · The Artist — S1E3`);
+  }
+  const audio = track("https://example.com/song", { audio: true, top: true, metadata: { title: "Track" } });
+  assert.equal(toActivity(audio).activityType, 2);
+  assert.equal(track("https://example.com/embed", { audio: true }), null);
+  assert.equal(toActivity(track("https://www.bbc.com/news/video", { top: true })).activityType, 3);
+  assert.equal(toActivity(track("https://tv.apple.com/watch", { top: true })).activityType, 3);
+});
+
+test("reads the active AniLiberty playlist entry and parses the new episode page", () => {
+  const title = "Свадьба светлячков / Hotaru no Yomeiri";
+  const legacy = "https://www.anilibria.tv/release/hotaru-no-yomeiri.html";
+  for (const episode of [1, 3]) {
+    const sample = track(legacy, { top: true, title, player: {}, selectors: {
+      "#anilibriaPlayer_playlist": { querySelector: selector => selector === ".pjs-anilibriaPlayer-active-pl"
+        ? { textContent: `Серия ${episode}` } : null }
+    } });
+    assert.equal(toActivity(sample).title, `AniLiberty · ${title} · Ep.${episode}`);
+  }
+  const modern = track("https://aniliberty.top/anime/video/episode/id", {
+    top: true, title: "Эпизод 6 | Искренние чувства | Свадьба светлячков | AniLiberty"
+  });
+  assert.equal(toActivity(modern).title, "AniLiberty · Свадьба светлячков · Ep.6");
 });
 
 test("uses VK video metadata and skips artwork URLs carrying parameters", () => {

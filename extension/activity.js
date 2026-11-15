@@ -10,7 +10,7 @@ export function validId(value) {
   return typeof value === "string" && /^\d{16,20}$/.test(value);
 }
 
-export function watchLink(value) {
+export function watchLink(value, linkEpisode) {
   let page;
   try {
     page = new URL(value);
@@ -42,6 +42,8 @@ export function watchLink(value) {
     if (!page.searchParams.has("oid") || !page.searchParams.has("id")) return "";
   } else if (matchingHost(host, ["bilibili.com"]) && path.startsWith("/video/")) {
     keep("p", /^[1-9]\d{0,3}$/);
+  } else if (matchingHost(host, ["anilibria.tv", "anilibria.uno"]) && /^\/release\/[\w-]+\.html$/.test(path)) {
+    if (/^[1-9]\d{0,3}$/.test(linkEpisode)) page.hash = `play-s${linkEpisode}`;
   } else if (/\/(?:watch|view_video|videos?|player|play|embed|series|episode|episodes)(?:[/.]|$)/i.test(path)) {
     // Generic routes can carry an explicit media ID instead of putting it in the path.
     for (const key of ["video_id", "videoId", "episode_id", "episodeId"]) {
@@ -59,7 +61,7 @@ export function allowedPage(url, blockedHosts) {
   try {
     const page = new URL(url);
     return ["https:", "http:", "file:"].includes(page.protocol)
-      && !matchingHost(page.hostname || "file:", blockedHosts);
+      && !isSpotify(page.hostname) && !matchingHost(page.hostname || "file:", blockedHosts);
   } catch {
     return false;
   }
@@ -67,6 +69,10 @@ export function allowedPage(url, blockedHosts) {
 
 export function matchingHost(host, rules) {
   return rules.find(rule => host === rule || host.endsWith(`.${rule}`));
+}
+
+export function isSpotify(host) {
+  return Boolean(matchingHost(host.replace(/\.$/, ""), ["spotify.com"]));
 }
 
 export function siteRule(value) {
@@ -119,9 +125,16 @@ export function toActivity(media, image = "") {
   let title = typeof media.title === "string"
     ? media.title.replace(/[\u0000-\u001f\u007f]/g, " ").trim()
     : "";
-  const episode = /^(.*?)[\s._-]*s(\d{1,2})[\s._-]*e(\d{1,3})(?=$|[\s._\[\]()-])(.*)$/i.exec(title);
-  const spelledOut = /^(.*?)\s*·\s*Season\s+(\d{1,4}),?\s+Episode\s+(\d{1,4})$/i.exec(title)
-    || /^(.*?)\s*\((\d{1,4})\s+сезон\)\s*[-–—]\s*(\d{1,4})\s+серия$/iu.exec(title);
+  const audio = media.audio === true;
+  const episode = !audio && /^(.*?)[\s._-]*s(\d{1,2})[\s._-]*e(\d{1,3})(?=$|[\s._\[\]()-])(.*)$/i.exec(title);
+  const spelledOut = !audio && (
+    /^(.*?)\s*(?:[·|–—]|\s-)\s*Season\s+(\d{1,4}),?\s+Episode\s+(\d{1,4})$/i.exec(title)
+    || /^(.*?)\s*\((\d{1,4})\s+сезон\)\s*[-–—]\s*(\d{1,4})\s+серия$/iu.exec(title)
+  );
+  const episodeOnly = !audio && (
+    /^(.*?)\s+[·|–—-]\s+(?:episode|ep\.|серия|эпизод)\s*(\d{1,4})$/iu.exec(title)
+    || /^(.*?)\s+[·|–—-]\s+(\d{1,4})\s+(?:серия|эпизод)$/iu.exec(title)
+  );
   let seasonNumber = media.season;
   let episodeNumber = media.episode;
   if (episode?.[1] && !/^\s*[-._ ]*e?\d{1,3}(?:$|[-._ ])/i.test(episode[4])) {
@@ -132,11 +145,18 @@ export function toActivity(media, image = "") {
     title = spelledOut[1];
     seasonNumber ??= spelledOut[2];
     episodeNumber ??= spelledOut[3];
+  } else if (episodeOnly?.[1]) {
+    title = episodeOnly[1];
+    episodeNumber ??= episodeOnly[2];
   }
-  if (/^\d{1,4}$/.test(episodeNumber)) {
+  let episodeSuffix = "";
+  if (!audio && /^\d{1,4}$/.test(episodeNumber)) {
     const seasonLabel = /^\d{1,4}$/.test(seasonNumber) ? `S${Number(seasonNumber)} ` : "";
-    title = `${title ? `${title} · ` : ""}${seasonLabel}Ep.${Number(episodeNumber)}`;
+    episodeSuffix = ` · ${seasonLabel}Ep.${Number(episodeNumber)}`;
   }
+  const artist = audio && typeof media.artist === "string"
+    ? media.artist.replace(/[\u0000-\u001f\u007f]/g, " ").trim() : "";
+  if (artist && title && title !== artist) title = `${artist} — ${title}`;
   const rate = `${media.rate.toFixed(2)}×`;
   const gap = rate.length < "31.25×".length ? " " : "\u2009";
   let detail = rate;
@@ -151,9 +171,12 @@ export function toActivity(media, image = "") {
     detail = `${time(media.position, 0)}${gap}·${gap}${rate}`;
   }
   if (media.state === "buffering") detail += " · Buffering";
-  if (media.source) title = `${media.source} · ${title || "Video"}`;
+  title ||= audio ? "Audio" : "Video";
+  if (media.source) title = `${media.source} · ${title}`;
   return {
-    title: `${Array.from(title || "Video").slice(0, 120).join("")}${media.state === "paused" ? " · ⏸\ufe0e" : ""}`,
+    activityType: audio ? 2 : 3,
+    linkEpisode: media.linkEpisode,
+    title: `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}${media.state === "paused" ? " · ⏸\ufe0e" : ""}`,
     detail: detail.replace(/\d/g, digit => String.fromCodePoint(0x1d7f6 + Number(digit))),
     image: media.artwork ? fitArtwork(media.artwork) : browserArtworkKey(image)
   };
@@ -174,6 +197,10 @@ const pagePlayers = new Map([
 ]);
 
 export function withPageMetadata(media, page) {
+  if (page?.source === "AniLiberty" && media && !media.audio && page.episodes?.[media.source]) {
+    return { ...media, source: page.source, title: page.title,
+      episode: page.episodes[media.source] || media.episode, artwork: page.artwork || media.artwork };
+  }
   if (!page || !media || !matchingHost(media.source ?? "", pagePlayers.get(page.source) ?? [])) return media;
   return { ...media, source: page.source, title: page.title,
     episode: page.episode ?? media.episode, artwork: page.artwork || media.artwork };

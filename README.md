@@ -2,7 +2,7 @@
 
 # WatchKit for Chrome
 
-**Show what you're watching in Chrome on your Discord profile.**
+**Show what you're watching or listening to in Chrome on your Discord profile.**
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20x64-0078D4)](#install)
 [![Chrome](https://img.shields.io/badge/Chrome-119%2B-4285F4)](#install)
@@ -12,7 +12,7 @@
 
 </div>
 
-WatchKit follows the selected Chrome tab. The Discord card shows the site, video title, preview when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
+WatchKit follows the selected Chrome tab. The Discord card shows the site, title, artwork when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
 
 ## WatchKit for Chrome and VLC
 
@@ -63,25 +63,33 @@ If the card is missing, open Discord's **User Settings → Activity Privacy** an
 
 - Switching tabs switches the activity. Selecting a tab without video clears it. Opening Discord or another app leaves the last selected Chrome tab as the source.
 - Open the popup on a website to **Pause until restart** or **Exclude site**. Manage both in **Settings → Website access → Excluded and paused sites**. A domain rule also covers its subdomains.
-- For local videos, enable **Allow access to file URLs** in the extension's Chrome details and grant access from the popup. The activity title is `Local video`.
+- For local media, enable **Allow access to file URLs** in the extension's Chrome details and grant access from the popup. WatchKit uses `Local video` or `Local audio` as the activity title.
 - Press **Ctrl+Shift+Y** while Chrome is focused to turn tracking off across the browser and clear the Discord activity. Press it again to resume. The toolbar icon shows **OFF** while tracking is off, and WatchKit remembers the setting after Chrome restarts.
 - To change the shortcut or assign one if it is unbound, click **Settings → Change shortcut** or open `chrome://extensions/shortcuts` and find **Toggle WatchKit tracking**.
 
-WatchKit detects accessible HTML video, including players in frames that Chrome allows it to read. Some sites expose limited metadata or use inaccessible players. Chrome internal pages and incognito windows are outside its scope.
+WatchKit detects accessible HTML video and audio, including players in frames that Chrome allows it to read. Playback that only uses Web Audio or an inaccessible player may not be detected. Chrome internal pages and incognito windows are outside its scope.
+
+### Music, podcasts and radio
+
+WatchKit uses **Listening** for YouTube Music, Apple Music and Podcasts, SoundCloud, Bandcamp, Deezer, TIDAL, Qobuz, Amazon Music, Yandex Music, VK Music, Mixcloud, Pocket Casts, Audible, TuneIn, BBC Sounds and other audio services. It can also recognize a standard HTML audio player on an unlisted site. Artist and artwork depend on the information exposed by the player.
+
+Spotify uses the [built-in Discord connection](https://support.discord.com/hc/en-us/articles/360000167212-Discord-Spotify-Connection). Link Spotify in **Discord Settings → Connections** and enable **Display Spotify as your status**.
 
 ### Series and embedded players
 
 | Site and player | What WatchKit reads |
 | --- | --- |
+| AniLiberty archive (`anilibria.tv`, `anilibria.uno`) | The active PlayerJS episode, which also opens from the **Watch too** link. Reads the selected episode from the RUTUBE and YouTube lists when their embedded player is active. |
+| AniLiberty episode pages | Series title and episode number from the active episode page. |
 | YummyAnime with Kodik | Page title, selected episode and poster from YummyAnime. The card prefers an English title when available. |
 | Habster with Alloha | Series title and poster from Habster. Season and episode come from the current Alloha controls. |
 | Habster with Collaps | Series title and poster from Habster. Season and episode come from the title that Collaps updates on episode changes. |
 | VK Video and RUTUBE | The video title and artwork when the player or page exposes them. Episode numbers depend on the video title or player metadata. |
-| Other players | The general HTML-video tracker uses the metadata a player exposes. Tracking time and tracking an episode are separate capabilities. |
+| Other players | WatchKit reads the episode from explicit labels in the title or the selected episode control when available. It still shows playback time when the episode is unknown. |
 
 ## Data and previews
 
-When you share playback, **Watch too** lets people who can see your Discord activity open the video page. To hide the link, turn off **Watch too button** under **Settings → Discord** and click **Save settings**. The button uses the page's HTTPS address and keeps only recognized video parameters, such as YouTube's video ID or the part number on Bilibili. If the player keeps the episode selection inside its frame, viewers can select the episode on the page. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
+**Watch too** and **Listen too** let people who see your Discord activity open its media page. To hide the link, turn off **Watch too / Listen too button** under **Settings → Discord** and click **Save settings**. WatchKit shares HTTPS links with recognized media identifiers, such as the YouTube video ID, Bilibili part number or AniLiberty episode. If the player keeps the episode selection inside its frame, viewers can select the episode on the page. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
 
 The extension saves your Discord application ID, artwork key, sharing preference, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets the extension follow page changes on the selected tab.
 

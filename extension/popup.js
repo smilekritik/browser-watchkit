@@ -1,4 +1,4 @@
-import { defaultSettings, matchingHost, siteRule, validId } from "./activity.js";
+import { defaultSettings, isSpotify, matchingHost, siteRule, validId } from "./activity.js";
 import { byId, getRules, setRule } from "./preferences.js";
 
 const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -17,7 +17,7 @@ byId("settings").onclick = byId("setup-row").onclick = () => chrome.runtime.open
 enabled.onchange = () => chrome.storage.local.set({ enabled: enabled.checked });
 
 const stateText = {
-  idle: "Waiting for video",
+  idle: "Waiting for playback",
   connecting: "Connecting to Discord…",
   published: "Sharing on Discord",
   rejected: "Discord rejected the activity",
@@ -36,12 +36,18 @@ async function refresh() {
   byId("setup-row").hidden = validId(config.applicationId);
   byId("status").textContent = !validId(config.applicationId) ? "Connect Discord to get started"
     : !config.enabled ? "Sharing is off"
+    : isSpotify(host) ? "Spotify uses Discord’s own connection"
     : excludedBy ? "This site is excluded"
     : pausedBy ? "This site is paused"
     : stateText[reply?.connection] ?? stateText.idle;
   byId("video").textContent = reply?.activity?.title ?? "";
   byId("timing").textContent = reply?.activity?.detail ?? "";
   if (!currentRule) return;
+  if (isSpotify(host)) {
+    byId("site-state").textContent = "Spotify is handled by Discord";
+    for (const control of [allow, byId("pause-site"), byId("block-site"), byId("resume-site")]) control.hidden = true;
+    return;
+  }
 
   const granted = await chrome.permissions.contains({ origins: [origin] });
   byId("site-state").textContent = excludedBy ? `Excluded by ${excludedBy}`

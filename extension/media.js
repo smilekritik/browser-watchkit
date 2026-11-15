@@ -7,20 +7,23 @@
   const videos = new Map();
   const roots = new Set();
   const topFrame = window === window.top;
+  const audioFile = /\.(?:aac|flac|m4a|mp3|oga|opus|wav)$/i.test(location.pathname);
   const youtubeMusic = topFrame && location.hostname === "music.youtube.com";
+  const legacyLibria = topFrame && /^(?:www\.)?anilibria\.(?:tv|uno)$/.test(location.hostname);
+  const libria = topFrame && /^(?:www\.)?(?:anilibria|aniliberty)\.(?:top|wtf)$/.test(location.hostname);
   const yummyAnime = topFrame && location.hostname === "old.yummyani.me"
     && location.pathname.startsWith("/catalog/item/");
   const habster = topFrame && location.hostname === "habster.sbs" && /^\/series\/\d+\/?$/.test(location.pathname);
   const alloha = location.hostname === "befriend.stravers.live";
   const collaps = /^(?:api\d*\.)?initem\.ws$/.test(location.hostname);
-  const episodeObserver = yummyAnime ? new MutationObserver(() => schedule()) : null;
+  const episodeObserver = yummyAnime || legacyLibria ? new MutationObserver(() => schedule()) : null;
   const observer = new MutationObserver(changes => {
     let changed = false;
     for (const change of changes) {
       for (const node of change.addedNodes) changed = scan(node) || changed;
       if (change.removedNodes.length && videos.size) changed = true;
     }
-    if (changed || yummyAnime || habster || ((alloha || collaps) && videos.size)) schedule();
+    if (changed || yummyAnime || habster || legacyLibria || ((alloha || collaps) && videos.size)) schedule();
   });
   let token;
   let queued;
@@ -40,7 +43,7 @@
 
   function inspect(element) {
     let changed = false;
-    if (element instanceof HTMLVideoElement && !videos.has(element)) {
+    if (element instanceof HTMLMediaElement && !videos.has(element)) {
       for (const event of events) element.addEventListener(event, changedVideo);
       videos.set(element, { played: !element.paused || element.currentTime > 0, waiting: false });
       changed = true;
@@ -79,6 +82,7 @@
 
   function selected() {
     let result = null;
+    const music = audioSource();
     const musicVideo = youtubeMusic ? document.querySelector("ytmusic-player video.html5-main-video") : null;
     for (const [video, state] of videos) {
       if (!video.isConnected) {
@@ -86,16 +90,20 @@
         continue;
       }
       if (video.ended || (video.paused && !state.played && video.currentTime === 0)) continue;
+      const audio = video instanceof HTMLAudioElement;
+      if (audio && !music && !video.controls && !audioFile
+          && !(topFrame && navigator.mediaSession?.metadata?.title)) continue;
       const rect = video.getBoundingClientRect();
       const width = Math.max(0, Math.min(rect.right, innerWidth) - Math.max(rect.left, 0));
       const height = Math.max(0, Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0));
       const area = width * height;
       const featured = document.fullscreenElement === video || document.pictureInPictureElement === video;
       if (video === musicVideo) return { video, state, score: 8_000_000 };
-      if ((!area && !featured) || getComputedStyle(video).visibility !== "visible") continue;
+      if (!audio && !music && ((!area && !featured) || getComputedStyle(video).visibility !== "visible")) continue;
       const score = Math.min(area, 1_000_000)
         + (!video.paused ? 2_000_000 : 0)
         + (!video.muted && video.volume > 0 ? 250_000 : 0)
+        + (audio && music && !video.paused ? 1_000_000 : 0)
         + (featured ? 4_000_000 : 0);
       if (!result || score > result.score) result = { video, state, score };
     }
@@ -112,19 +120,74 @@
     return duration > 0 && position <= duration ? { position, duration } : null;
   }
 
+  const audioSites = {
+    "music.youtube.com": "YouTube Music", "music.apple.com": "Apple Music",
+    "podcasts.apple.com": "Apple Podcasts", "soundcloud.com": "SoundCloud",
+    "bandcamp.com": "Bandcamp", "deezer.com": "Deezer", "tidal.com": "TIDAL",
+    "qobuz.com": "Qobuz", "music.amazon.com": "Amazon Music", "music.amazon.co.uk": "Amazon Music",
+    "music.amazon.de": "Amazon Music", "music.amazon.fr": "Amazon Music", "music.amazon.co.jp": "Amazon Music",
+    "music.amazon.ca": "Amazon Music", "music.amazon.it": "Amazon Music", "music.amazon.es": "Amazon Music",
+    "music.amazon.com.au": "Amazon Music", "music.amazon.com.br": "Amazon Music", "music.amazon.com.mx": "Amazon Music",
+    "music.yandex.ru": "Яндекс Музыка", "music.yandex.com": "Яндекс Музыка", "music.yandex.kz": "Яндекс Музыка",
+    "music.vk.com": "VK Музыка", "zvuk.com": "Звук", "mixcloud.com": "Mixcloud",
+    "audiomack.com": "Audiomack", "audius.co": "Audius", "pandora.com": "Pandora",
+    "iheart.com": "iHeartRadio", "tunein.com": "TuneIn", "radio.garden": "Radio Garden",
+    "radioplayer.org": "Radioplayer", "kexp.org": "KEXP", "radioparadise.com": "Radio Paradise",
+    "di.fm": "DI.FM", "jazzradio.com": "JAZZRADIO", "somafm.com": "SomaFM",
+    "radio.net": "radio.net", "onlineradiobox.com": "Online Radio Box",
+    "bbc.co.uk": "BBC Sounds", "bbc.com": "BBC Sounds",
+    "audible.com": "Audible", "audible.co.uk": "Audible", "audible.de": "Audible",
+    "audible.ca": "Audible", "audible.fr": "Audible", "audible.it": "Audible", "audible.es": "Audible",
+    "audible.com.au": "Audible", "audible.co.jp": "Audible", "audible.in": "Audible",
+    "storytel.com": "Storytel", "bookmate.com": "Bookmate",
+    "pocketcasts.com": "Pocket Casts", "podbean.com": "Podbean", "spreaker.com": "Spreaker",
+    "castbox.fm": "Castbox", "overcast.fm": "Overcast",
+    "podcastaddict.com": "Podcast Addict", "podchaser.com": "Podchaser",
+    "player.fm": "Player FM", "listennotes.com": "Listen Notes", "fountain.fm": "Fountain",
+    "podcasts.yandex.ru": "Яндекс Подкасты", "mave.digital": "Mave",
+    "jiosaavn.com": "JioSaavn", "gaana.com": "Gaana", "boomplay.com": "Boomplay",
+    "music.163.com": "NetEase Cloud Music", "y.qq.com": "QQ Music", "kuwo.cn": "Kuwo",
+    "kugou.com": "Kugou", "kkbox.com": "KKBOX", "joox.com": "JOOX", "anghami.com": "Anghami",
+    "melon.com": "Melon", "music.bugs.co.kr": "Bugs", "genie.co.kr": "Genie"
+  };
   const knownSites = {
     "youtube.com": "YouTube", "youtube-nocookie.com": "YouTube", "youtu.be": "YouTube",
     "twitch.tv": "Twitch", "tiktok.com": "TikTok", "bilibili.com": "Bilibili",
     "netflix.com": "Netflix", "vimeo.com": "Vimeo", "primevideo.com": "Prime Video",
     "disneyplus.com": "Disney+", "crunchyroll.com": "Crunchyroll",
-    "vkvideo.ru": "VK Video", "rutube.ru": "RUTUBE"
+    "vkvideo.ru": "VK Video", "rutube.ru": "RUTUBE", "kick.com": "Kick",
+    "dailymotion.com": "Dailymotion", "dai.ly": "Dailymotion", "viki.com": "Viki",
+    "hidive.com": "HIDIVE", "hulu.com": "Hulu", "max.com": "HBO Max", "hbomax.com": "HBO Max",
+    "tv.apple.com": "Apple TV", "peacocktv.com": "Peacock", "paramountplus.com": "Paramount+",
+    "dropout.tv": "Dropout", "nebula.tv": "Nebula", "pluto.tv": "Pluto TV", "tubitv.com": "Tubi", "npr.org": "NPR",
+    "plex.tv": "Plex", "floatplane.com": "Floatplane", "nicovideo.jp": "Niconico", "abema.tv": "ABEMA",
+    "iq.com": "iQIYI", "wetv.vip": "WeTV", "viu.com": "Viu", "crackle.com": "Crackle",
+    "ok.ru": "OK", "kinopoisk.ru": "Кинопоиск", "ivi.ru": "Иви", "okko.tv": "Okko",
+    "wink.ru": "Wink", "kinogo.ec": "Kinogo", "smotrim.ru": "Смотрим",
+    "anilibria.tv": "AniLiberty", "anilibria.uno": "AniLiberty", "anilibria.top": "AniLiberty",
+    "aniliberty.top": "AniLiberty", "aniliberty.wtf": "AniLiberty", "anilibria.wtf": "AniLiberty"
   };
+
+  function siteName(sites) {
+    let host = location.hostname;
+    while (host) {
+      if (Object.hasOwn(sites, host)) return sites[host];
+      const separator = host.indexOf(".");
+      if (separator < 0) break;
+      host = host.slice(separator + 1);
+    }
+  }
+
+  function audioSource() {
+    if (/(?:^|\.)bbc\.(?:com|co\.uk)$/.test(location.hostname) && !/^\/sounds(?:\/|$)/.test(location.pathname)) return "";
+    if (/^(?:www\.|m\.)?vk\.com$/.test(location.hostname) && /^\/audios?(?:\d+)?(?:\/|$)/.test(location.pathname)) return "VK Музыка";
+    return siteName(audioSites);
+  }
 
   function videoSource() {
     if (location.protocol === "file:") return "Chrome";
     const host = location.hostname.replace(/^www\./, "");
-    const site = Object.keys(knownSites).find(domain => host === domain || host.endsWith(`.${domain}`));
-    return site ? knownSites[site] : host.slice(0, 48) || "Chrome";
+    return siteName(knownSites) || host.slice(0, 48) || "Chrome";
   }
 
   function artwork(video, metadata, source) {
@@ -175,19 +238,28 @@
 
   function snapshot({ video, state, score }) {
     const metadata = navigator.mediaSession?.metadata;
-    const source = videoSource();
+    const music = audioSource();
+    const audio = Boolean(music) || video instanceof HTMLAudioElement || audioFile;
+    const source = music || videoSource();
     const timing = youtubeMusic && musicTiming();
     const vkEmbed = location.hostname === "vk.com" && location.pathname === "/video_ext.php";
     const videoPageTitle = vkEmbed || source === "VK Video" || source === "RUTUBE"
       ? document.querySelector('meta[property="og:title"]')?.content.trim() : "";
+    const libriaTitle = libria && /^\/anime\/video\/episode\//.test(location.pathname)
+      && /^Эпизод\s+(\d{1,4})\s+\|\s+(.+)\s+\|\s+AniLiberty$/iu.exec(document.title);
+    const localPlayer = legacyLibria && video.closest("#anilibriaPlayer");
     const title = location.protocol === "file:"
-      ? "Local video"
+      ? audio ? "Local audio" : "Local video"
+      : libriaTitle ? libriaTitle[2].split(" | ").at(-1)
+      : localPlayer ? document.title
       : metadata?.title || video.getAttribute("title")
-        || videoPageTitle || document.title || location.hostname || "Video";
+        || videoPageTitle || document.title || location.hostname || (audio ? "Audio" : "Video");
     const media = {
       title: title.slice(0, 256),
       source: youtubeMusic ? "YouTube Music" : vkEmbed ? "VK Video" : source,
-      artwork: artwork(video, metadata, source),
+      artist: audio && location.protocol !== "file:" ? metadata?.artist?.trim().slice(0, 120) : undefined,
+      audio,
+      artwork: artwork(video, metadata, youtubeMusic ? "YouTube" : source),
       position: timing?.position ?? video.currentTime,
       duration: timing?.duration ?? (Number.isFinite(video.duration) ? video.duration : null),
       rate: video.playbackRate,
@@ -195,7 +267,15 @@
       live: !timing && video.duration === Infinity,
       score
     };
-    if (alloha) {
+    if (localPlayer) {
+      const panel = document.getElementById("anilibriaPlayer_playlist");
+      observeEpisodePanel(panel);
+      const label = panel?.querySelector(".pjs-anilibriaPlayer-active-pl")?.textContent.trim();
+      media.episode = episodeLabel(label);
+      media.linkEpisode = media.episode;
+    } else if (libriaTitle) {
+      media.episode = libriaTitle[1];
+    } else if (alloha) {
       media.season = allohaSelection("seasonType1");
       media.episode = allohaSelection("episodeType1");
     }
@@ -205,7 +285,24 @@
       media.season = selection?.[1];
       media.episode = selection?.[2];
     }
+    if (!audio && !media.episode) {
+      const control = document.querySelector(
+        '[data-episode-number][aria-current="true"], [data-episode-number][aria-current="page"], ' +
+        '[data-episode-number][aria-selected="true"]'
+      );
+      const episode = control?.getAttribute("data-episode-number");
+      const season = control?.getAttribute("data-season-number");
+      if (/^\d{1,4}$/.test(episode)) {
+        media.episode = episode;
+        media.season = /^\d{1,4}$/.test(season) ? season : undefined;
+      }
+    }
     return media;
+  }
+
+  function episodeLabel(label) {
+    return /^(?:(?:серия|эпизод|episode)\s+(\d{1,4})|(\d{1,4})\s+(?:серия|эпизод))$/iu
+      .exec(label ?? "")?.slice(1).find(Boolean);
   }
 
   function allohaSelection(control) {
@@ -213,13 +310,17 @@
     return /\b(\d{1,4})$/.exec(label?.textContent.trim() ?? "")?.[1];
   }
 
-  function yummyAnimePage() {
-    const panel = document.getElementById("video");
-    if (panel !== episodePanel) {
+  function observeEpisodePanel(panel) {
+    if (panel !== episodePanel && episodeObserver) {
       episodeObserver.disconnect();
       episodePanel = panel;
       if (panel) episodeObserver.observe(panel, { subtree: true, attributes: true, attributeFilter: ["class"] });
     }
+  }
+
+  function yummyAnimePage() {
+    const panel = document.getElementById("video");
+    observeEpisodePanel(panel);
     // YummyAnime's player bundle marks the selected episode with these CSS module classes.
     const titles = document.querySelector(".titles");
     const localized = titles?.querySelector('h1[itemprop="name"]')?.textContent.trim();
@@ -248,7 +349,15 @@
   }
 
   function reportPage(watching) {
-    const page = yummyAnime ? yummyAnimePage() : habsterPage();
+    const page = yummyAnime ? yummyAnimePage() : habster ? habsterPage() : {
+      source: "AniLiberty",
+      title: document.title.slice(0, 256),
+      artwork: artwork(null, null, "AniLiberty"),
+      episodes: {
+        YouTube: document.querySelector("#youtubeEpisodes select")?.value,
+        RUTUBE: document.querySelector("#rutubeEpisodes select")?.value
+      }
+    };
     const signature = JSON.stringify(page);
     if (signature === lastPage) return;
     lastPage = signature;
@@ -261,12 +370,12 @@
     queued = undefined;
     const watching = token;
     if (!watching) return;
-    if (yummyAnime || habster) reportPage(watching);
+    if (yummyAnime || habster || legacyLibria) reportPage(watching);
     const choice = selected();
     const media = choice ? snapshot(choice) : null;
     const now = performance.now();
     const interval = media?.state === "playing" ? 5000 : 10000;
-    const signature = media && JSON.stringify([media.source, media.title, media.artwork,
+    const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.artwork,
       media.duration, media.rate, media.state, media.live, media.season, media.episode]);
     if (force || (media && (seeked || choice.video !== lastReport?.video
         || signature !== lastReport?.signature || now - sentAt >= interval))
@@ -314,6 +423,7 @@
     removeEventListener("resize", viewportChanged);
     removeEventListener("scroll", viewportChanged, true);
     document.removeEventListener("fullscreenchange", schedule);
+    document.removeEventListener("change", schedule);
     removeEventListener("pagehide", stop);
   }
 
@@ -326,6 +436,7 @@
     addEventListener("resize", viewportChanged, { passive: true });
     addEventListener("scroll", viewportChanged, { passive: true, capture: true });
     document.addEventListener("fullscreenchange", schedule);
+    if (legacyLibria) document.addEventListener("change", schedule);
     addEventListener("pagehide", stop, { once: true });
     report(true);
   });

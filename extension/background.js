@@ -83,8 +83,9 @@ function publish(activity) {
       connection = error ? "unavailable" : "idle";
     });
   }
-  const message = { type: "activity", applicationId: settings.applicationId, ...activity };
-  const link = settings.shareLink ? watchLink(current?.url) : "";
+  const { linkEpisode, ...presence } = activity;
+  const message = { type: "activity", applicationId: settings.applicationId, ...presence };
+  const link = settings.shareLink ? watchLink(current?.url, linkEpisode) : "";
   if (link) message.watchUrl = link;
   const packet = JSON.stringify(message);
   if (packet === lastPacket) return;

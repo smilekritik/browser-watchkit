@@ -119,9 +119,11 @@ int main()
                     report("rejected");
                 } else {
                     active_id = id;
+                    const auto kind = message.find("activityType");
+                    const bool listening = kind != message.end() && kind->is_number_integer() && *kind == 2;
                     discord.update(std::move(id), addon::Activity{
                         std::move(title), string_field(message, "detail"), string_field(message, "image"),
-                        string_field(message, "watchUrl")
+                        string_field(message, "watchUrl"), listening ? 2 : 3
                     });
                 }
             }
