@@ -122,3 +122,5 @@ To remove it, close Chrome, unblock and run `./scripts/uninstall.ps1` from the r
 Clone this repository or extract the source ZIP. In PowerShell 7, use `Get-ChildItem ./scripts -Filter *.ps1 -File | Unblock-File` if needed, then run `./scripts/build.ps1`. The build downloads and verifies its compiler and JSON header. Run **Install WatchKit.bat** in the checkout, then load its `extension` folder in Chrome. Run `npm test` with Node.js to check activity formatting and selection.
 
 The native Discord transport is shared with [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit). See [LICENSE](LICENSE).
+
+To package a release, build the bridge from the tagged revision, then run `./scripts/package-release.ps1 -Tag vX.Y.Z`. Upload the ZIP and `SHA256SUMS.txt` from `build/release/vX.Y.Z` to GitHub Releases. The script checks that the installer is at the archive root and that the Chrome manifest matches the tag.

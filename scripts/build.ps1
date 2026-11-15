@@ -25,6 +25,7 @@ try {
         if ($LASTEXITCODE) { throw 'Could not extract llvm-mingw.' }
     }
     Get-Dependency '.deps/json.hpp' 'https://raw.githubusercontent.com/nlohmann/json/v3.12.0/single_include/nlohmann/json.hpp' AAF127C04CB31C406E5B04A63F1AE89369FCCDE6D8FA7CDDA1ED4F32DFC5DE63
+    Get-Dependency '.deps/nlohmann-license.txt' 'https://raw.githubusercontent.com/nlohmann/json/v3.12.0/LICENSE.MIT' 46A65CFFD1EA955132D95A8DD921640714A8D6B537D2E4E482D31145AE95B603
     & $compiler -std=c++20 -O2 -DNDEBUG -Wall -Wextra -Werror -static '-Wl,--no-insert-timestamp' -s -DWIN32_LEAN_AND_MEAN -DNOMINMAX -D_WIN32_WINNT=0x0A00 -isystem .deps native/main.cpp native/discord.cpp -o build/browser-watchkit-host.exe
     if ($LASTEXITCODE) { throw 'Could not build the native bridge.' }
     Write-Host 'Built build/browser-watchkit-host.exe'
