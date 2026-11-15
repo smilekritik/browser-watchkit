@@ -1,4 +1,4 @@
-import { allowedPage, bestMedia, defaultSettings, toActivity, validId, withPageMetadata } from "./activity.js";
+import { allowedPage, bestMedia, defaultSettings, toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 let settings = defaultSettings;
@@ -84,6 +84,8 @@ function publish(activity) {
     });
   }
   const message = { type: "activity", applicationId: settings.applicationId, ...activity };
+  const link = settings.shareLink ? watchLink(current?.url) : "";
+  if (link) message.watchUrl = link;
   const packet = JSON.stringify(message);
   if (packet === lastPacket) return;
   try {

@@ -2,11 +2,57 @@ export const defaultSettings = {
   enabled: false,
   applicationId: "",
   blockedHosts: [],
+  shareLink: true,
   image: ""
 };
 
 export function validId(value) {
   return typeof value === "string" && /^\d{16,20}$/.test(value);
+}
+
+export function watchLink(value) {
+  let page;
+  try {
+    page = new URL(value);
+  } catch {
+    return "";
+  }
+  const host = page.hostname.replace(/\.$/, "");
+  if (page.protocol !== "https:" || page.username || page.password || page.port
+      || !/\.[a-z][a-z0-9-]*$/i.test(host)
+      || /\.(?:localhost|local|internal|lan|home|test|invalid|example|onion)$/i.test(host)) return "";
+
+  const params = new URLSearchParams(page.search);
+  page.search = "";
+  page.hash = "";
+  const keep = (key, pattern) => {
+    const value = params.get(key);
+    if (pattern.test(value ?? "")) page.searchParams.set(key, value);
+  };
+  const path = page.pathname.replace(/\/$/, "");
+  if (matchingHost(host, ["youtube.com"]) && path === "/watch") {
+    keep("v", /^[\w-]{11}$/);
+    if (!page.searchParams.has("v")) return "";
+  } else if (matchingHost(host, ["pornhub.com"]) && path === "/view_video.php") {
+    keep("viewkey", /^[A-Za-z0-9_-]{1,64}$/);
+    if (!page.searchParams.has("viewkey")) return "";
+  } else if (matchingHost(host, ["vkvideo.ru", "vk.com"]) && path === "/video_ext.php") {
+    keep("oid", /^-?[1-9]\d{0,19}$/);
+    keep("id", /^[1-9]\d{0,19}$/);
+    if (!page.searchParams.has("oid") || !page.searchParams.has("id")) return "";
+  } else if (matchingHost(host, ["bilibili.com"]) && path.startsWith("/video/")) {
+    keep("p", /^[1-9]\d{0,3}$/);
+  } else if (/\/(?:watch|view_video|videos?|player|play|embed|series|episode|episodes)(?:[/.]|$)/i.test(path)) {
+    // Generic routes can carry an explicit media ID instead of putting it in the path.
+    for (const key of ["video_id", "videoId", "episode_id", "episodeId"]) {
+      keep(key, /^[A-Za-z0-9_-]{1,64}$/);
+    }
+    for (const key of ["season", "episode"]) keep(key, /^\d{1,4}$/);
+    if (params.size && !page.searchParams.size && /\/(?:watch|view_video|player|play|embed)(?:\.[a-z]+)?$/i.test(path)) {
+      return "";
+    }
+  }
+  return page.href.length <= 512 ? page.href : "";
 }
 
 export function allowedPage(url, blockedHosts) {
@@ -74,8 +120,22 @@ export function toActivity(media, image = "") {
     ? media.title.replace(/[\u0000-\u001f\u007f]/g, " ").trim()
     : "";
   const episode = /^(.*?)[\s._-]*s(\d{1,2})[\s._-]*e(\d{1,3})(?=$|[\s._\[\]()-])(.*)$/i.exec(title);
+  const spelledOut = /^(.*?)\s*·\s*Season\s+(\d{1,4}),?\s+Episode\s+(\d{1,4})$/i.exec(title)
+    || /^(.*?)\s*\((\d{1,4})\s+сезон\)\s*[-–—]\s*(\d{1,4})\s+серия$/iu.exec(title);
+  let seasonNumber = media.season;
+  let episodeNumber = media.episode;
   if (episode?.[1] && !/^\s*[-._ ]*e?\d{1,3}(?:$|[-._ ])/i.test(episode[4])) {
-    title = `${episode[1]}${episode[4]} · S${Number(episode[2])} Ep.${Number(episode[3])}`;
+    title = `${episode[1]}${episode[4]}`;
+    seasonNumber ??= episode[2];
+    episodeNumber ??= episode[3];
+  } else if (spelledOut) {
+    title = spelledOut[1];
+    seasonNumber ??= spelledOut[2];
+    episodeNumber ??= spelledOut[3];
+  }
+  if (/^\d{1,4}$/.test(episodeNumber)) {
+    const seasonLabel = /^\d{1,4}$/.test(seasonNumber) ? `S${Number(seasonNumber)} ` : "";
+    title = `${title ? `${title} · ` : ""}${seasonLabel}Ep.${Number(episodeNumber)}`;
   }
   const rate = `${media.rate.toFixed(2)}×`;
   const gap = rate.length < "31.25×".length ? " " : "\u2009";
@@ -115,9 +175,6 @@ const pagePlayers = new Map([
 
 export function withPageMetadata(media, page) {
   if (!page || !media || !matchingHost(media.source ?? "", pagePlayers.get(page.source) ?? [])) return media;
-  let title = page.title;
-  if (page.source === "Habster" && media.episode) {
-    title += media.season ? ` · Season ${media.season}, Episode ${media.episode}` : ` · Episode ${media.episode}`;
-  }
-  return { ...media, source: page.source, title, artwork: page.artwork || media.artwork };
+  return { ...media, source: page.source, title: page.title,
+    episode: page.episode ?? media.episode, artwork: page.artwork || media.artwork };
 }

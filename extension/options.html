@@ -26,6 +26,14 @@
           <label for="image">Fallback artwork key <span>(optional)</span></label>
           <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off" aria-describedby="image-hint">
           <p class="hint" id="image-hint">Enter an Art Assets key from your Discord application to use when the video has no preview.</p>
+          <div class="link-setting">
+            <label class="sharing-toggle" for="share-link">
+              <span>Watch too button</span>
+              <input id="share-link" type="checkbox" role="switch" aria-describedby="share-link-hint">
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+            <p class="hint" id="share-link-hint">People who see your Discord activity can open the video’s page.</p>
+          </div>
           <div class="actions">
             <button class="primary" type="submit">Save settings</button>
             <button id="import-vlc" type="button">Import ID from WatchKit for VLC</button>
@@ -35,8 +43,10 @@
       </section>
       <section class="panel" aria-labelledby="access-heading">
         <h2 id="access-heading"><svg class="icon" aria-hidden="true"><use href="icons.svg#globe"/></svg>Website access</h2>
-        <p class="hint">Allow all websites to track players embedded from a different domain. For individual sites, use the WatchKit toolbar popup.</p>
-        <button id="allow-all" type="button">Allow all websites</button>
+        <div class="access-setting">
+          <p class="hint">Grant access to all websites to track embedded players on other domains. Manage individual sites from the toolbar popup.</p>
+          <button id="allow-all" type="button">Allow all websites</button>
+        </div>
         <p id="access-notice" class="hint feedback" role="status"></p>
         <div class="site-rules">
           <h3>Excluded and paused sites</h3>

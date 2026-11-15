@@ -1,19 +1,50 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowedPage, bestMedia, toActivity, validId, withPageMetadata } from "../extension/activity.js";
+import { allowedPage, bestMedia, toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
 const normalDigits = value => value.detail.normalize("NFKC");
+
+test("shares a video page without credentials, fragments or unrelated parameters", () => {
+  assert.equal(watchLink("https://www.youtube.com/watch?v=M7lc1UVf-VE&token=private#part"),
+    "https://www.youtube.com/watch?v=M7lc1UVf-VE");
+  assert.equal(watchLink("https://www.bilibili.com/video/BV123?p=2&from=home"), "https://www.bilibili.com/video/BV123?p=2");
+  assert.equal(watchLink("https://habster.sbs/series/4541515/?utm_referrer=search"), "https://habster.sbs/series/4541515/");
+  for (const url of ["file:///C:/example.mp4", "https://localhost/video", "https://192.168.1.2/video",
+    "https://user:pass@youtube.com/watch?v=M7lc1UVf-VE", "https://youtube.com/watch?token=private",
+    `https://habster.sbs/${"a".repeat(512)}`]) {
+    assert.equal(watchLink(url), "");
+  }
+});
+
+test("retains video and episode identifiers across link formats", () => {
+  const links = [
+    ["https://rt.pornhub.com/view_video.php?viewkey=ph123abc&utm_source=example",
+      "https://rt.pornhub.com/view_video.php?viewkey=ph123abc"],
+    ["https://music.youtube.com/watch?v=J63aZNuoRek&list=RD123",
+      "https://music.youtube.com/watch?v=J63aZNuoRek"],
+    ["https://vkvideo.ru/video_ext.php?oid=-123&id=456&autoplay=1",
+      "https://vkvideo.ru/video_ext.php?oid=-123&id=456"],
+    ["https://watch.example.com/player?videoId=abcd1234&season=3&episode=10&access_token=secret",
+      "https://watch.example.com/player?videoId=abcd1234&season=3&episode=10"],
+    ["https://rutube.ru/video/7716bd3e665725c3c008ae7ab4ff02e2/?utm_source=example",
+      "https://rutube.ru/video/7716bd3e665725c3c008ae7ab4ff02e2/"],
+    ["https://rt.pornhub.com/view_video.php?token=secret", ""],
+    ["https://watch.example.com/player?token=secret", ""]
+  ];
+  for (const [input, expected] of links) assert.equal(watchLink(input), expected, input);
+});
 
 test("uses YummyAnime metadata for Kodik while keeping the player's timing", () => {
   const kodik = { ...paused, source: "kodikplayer.com", title: "Kodik Player", state: "playing" };
   const page = {
     source: "YummyAnime",
-    title: "Great Lord! 3rd Season · Episode 9",
+    title: "Great Lord! 3rd Season",
+    episode: "9",
     artwork: "https://static.yani.tv/posters/full/1636859220.jpg"
   };
   const activity = toActivity(withPageMetadata(kodik, page));
-  assert.equal(activity.title, `YummyAnime · ${page.title}`);
+  assert.equal(activity.title, `YummyAnime · ${page.title} · Ep.9`);
   assert.equal(activity.image, page.artwork);
   assert.equal(activity.detail, toActivity(kodik).detail);
   assert.equal(withPageMetadata(kodik, null), kodik);
@@ -25,10 +56,17 @@ test("uses YummyAnime metadata for Kodik while keeping the player's timing", () 
 test("uses season and episode from the active Habster player", () => {
   const player = { ...paused, source: "befriend.stravers.live", season: "2", episode: "4", state: "playing" };
   const page = { source: "Habster", title: "Silo", artwork: "" };
-  assert.equal(toActivity(withPageMetadata(player, page)).title, "Habster · Silo · Season 2, Episode 4");
+  assert.equal(toActivity(withPageMetadata(player, page)).title, "Habster · Silo · S2 Ep.4");
   assert.equal(toActivity(withPageMetadata({ ...player, season: "3", episode: "1" }, page)).title,
-    "Habster · Silo · Season 3, Episode 1");
+    "Habster · Silo · S3 Ep.1");
   assert.equal(toActivity(withPageMetadata({ ...player, episode: undefined }, page)).title, "Habster · Silo");
+});
+
+test("formats explicit season and episode labels on any service", () => {
+  for (const title of ["Silo · Season 3, Episode 10", "Silo (3 сезон) - 10 серия"]) {
+    assert.equal(toActivity({ ...paused, title, state: "playing", source: "VK Video" }).title,
+      "VK Video · Silo · S3 Ep.10");
+  }
 });
 
 test("formats WatchKit timing at the actual playback speed", () => {

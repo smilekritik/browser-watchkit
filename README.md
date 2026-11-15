@@ -81,6 +81,8 @@ WatchKit detects accessible HTML video, including players in frames that Chrome 
 
 ## Data and previews
 
+When you share playback, **Watch too** lets people who can see your Discord activity open the video page. To hide the link, turn off **Watch too button** under **Settings → Discord** and click **Save settings**. The button uses the page's HTTPS address and keeps only recognized video parameters, such as YouTube's video ID or the part number on Bilibili. If the player keeps the episode selection inside its frame, viewers can select the episode on the page. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
+
 The extension saves your Discord application ID, artwork key, sharing preference, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets the extension follow page changes on the selected tab.
 
 WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. For supported YouTube and Bilibili previews, Discord receives a wsrv.nl image URL with the original public thumbnail URL as a parameter. wsrv.nl fits the full image into a square with black padding as needed. Other previews use their original URL. WatchKit skips external artwork URLs that contain query strings, which can carry session or access tokens. If it finds no usable URL, it uses your optional fallback artwork key.

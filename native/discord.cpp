@@ -80,6 +80,9 @@ void Discord::update(std::string id, std::optional<Activity> value)
     json activity{{"type", value->type}, {"details", clean(value->title)}};
     if (!value->detail.empty()) activity["state"] = clean(value->detail);
     if (!value->image.empty()) activity["assets"] = {{"large_image", value->image}};
+    if (value->watch_url.starts_with("https://") && value->watch_url.size() <= 512) {
+        activity["buttons"] = json::array({{{"label", "Watch too"}, {"url", value->watch_url}}});
+    }
     if (value->end > 0) activity["timestamps"] = {{"end", value->end}};
     auto payload = activity.dump(-1, ' ', false, json::error_handler_t::replace);
     if (wanted_ == payload && (deadline_ || pipe_ != INVALID_HANDLE_VALUE))

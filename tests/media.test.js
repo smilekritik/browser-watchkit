@@ -2,12 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { toActivity } from "../extension/activity.js";
 
 const mediaScript = readFileSync(new URL("../extension/media.js", import.meta.url), "utf8");
 
-function track(url, { title = "", selectors = {}, images = [] } = {}) {
+function track(url, { title = "", selectors = {}, images = [], top = false, media = {} } = {}) {
   const watchWindow = {};
-  watchWindow.top = {};
+  watchWindow.top = top ? watchWindow : {};
   const sent = [];
   let onMessage;
   const video = new class Video {
@@ -21,6 +22,7 @@ function track(url, { title = "", selectors = {}, images = [] } = {}) {
     getAttribute() { return null; }
     getBoundingClientRect() { return { left: 0, top: 0, right: 640, bottom: 360 }; }
   }();
+  Object.assign(video, media);
   const document = {
     title,
     baseURI: url,
@@ -62,6 +64,19 @@ test("reads Alloha's selected controls and Collaps's current episode title", () 
   const collaps = track("https://api.initem.ws/embed/kp/4541515", { title: "Укрытие (3 сезон) - 10 серия" });
   assert.equal(collaps.season, "3");
   assert.equal(collaps.episode, "10");
+});
+
+test("uses the YouTube Music player clock for position, duration and time left", () => {
+  const url = "https://music.youtube.com/watch?v=J63aZNuoRek";
+  const media = { currentTime: 202, duration: 302 };
+  const sample = track(url, { title: "Observing Medley", top: true, media, selectors: {
+    "ytmusic-player-bar .time-info": { textContent: " 0:37 / 3:30 " }
+  } });
+  assert.equal(sample.source, "YouTube Music");
+  assert.equal(sample.position, 37);
+  assert.equal(sample.duration, 210);
+  assert.equal(toActivity(sample).detail.normalize("NFKC"), "00:37 / 03:30 · 1.00× · 02:53 left");
+  assert.equal(track(url, { top: true, media }).duration, 302);
 });
 
 test("uses VK video metadata and skips artwork URLs carrying parameters", () => {

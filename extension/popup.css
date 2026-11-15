@@ -66,9 +66,9 @@ a { color: var(--accent); text-underline-offset: 3px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
-.popup { width: 350px; max-width: 100vw; padding: 15px; }
+.popup { width: 404px; padding: 18px; }
 .topbar, .sharing-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.topbar { margin-bottom: 12px; }
+.topbar { padding-bottom: 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); }
 .topbar h1 { font-size: 23px; letter-spacing: -.035em; }
 .icon-button { width: 38px; padding: 0; }
 .icon-button .icon { width: 21px; height: 21px; }
@@ -92,38 +92,49 @@ a { color: var(--accent); text-underline-offset: 3px; }
   display: flex;
   align-items: flex-start;
   gap: 11px;
-  padding: 12px;
+  padding: 15px;
   background: var(--activity);
   overflow-wrap: anywhere;
 }
 .activity .icon { color: var(--accent); }
-#video:not(:empty) { display: block; margin-top: 2px; font-size: 15px; }
-#timing { margin-top: 2px; font-variant-numeric: tabular-nums; font-size: 13px; }
+#video:not(:empty) { display: block; margin-top: 4px; font-size: 16px; line-height: 1.35; }
+#timing:not(:empty) { margin-top: 7px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
 .setup { margin-top: 10px; }
-.site-panel { background: var(--panel); padding: 12px; }
+.site-panel { background: var(--panel); padding: 15px; }
 .site-header { display: flex; align-items: flex-start; gap: 10px; overflow-wrap: anywhere; }
 .site-header .icon { color: var(--accent); }
 .site-panel .actions { margin-top: 10px; }
-.site-panel button { font-size: 12px; min-height: 34px; padding: 6px 9px; }
+.site-panel button { font-size: 13px; min-height: 36px; padding: 6px 10px; }
 
 .options { padding: clamp(24px, 7vh, 76px) clamp(15px, 4vw, 36px); }
-.options main { max-width: 900px; margin-inline: auto; }
-.page-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 23px; }
+.options main { max-width: 980px; margin-inline: auto; }
+.page-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
 .page-heading h1 { font-size: clamp(24px, 4vw, 37px); letter-spacing: -.035em; line-height: 1.2; }
 .page-heading .icon { width: 27px; height: 27px; color: var(--accent); --icon-background: var(--background); }
-.preferences { display: grid; gap: 14px; align-items: start; }
-.panel { padding: clamp(14px, 3vw, 22px); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-.panel h2 { display: flex; align-items: center; gap: 9px; font-size: 17px; margin-bottom: 8px; }
+.preferences { display: grid; gap: 18px; align-items: start; }
+.panel { padding: clamp(17px, 3vw, 26px); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.panel h2 { display: flex; align-items: center; gap: 10px; font-size: 19px; margin-bottom: 12px; }
 .panel h2 .icon { color: var(--accent); }
-.panel h3 { font-size: 15px; }
-.panel form { display: grid; gap: 6px; margin-top: 12px; }
-.panel form .actions, #allow-all { margin-top: 8px; }
+.panel h3 { font-size: 16px; }
+.panel form { display: grid; gap: 8px; margin-top: 16px; }
+.panel form .actions { margin-top: 8px; }
 .panel label { font-weight: 600; }
 .panel label span { color: var(--muted); font-weight: 400; }
-.panel form > label:not(:first-child) { margin-top: 7px; }
+.panel form > label:not(:first-child) { margin-top: 10px; }
 .panel input { background: var(--background); width: 100%; min-width: 0; }
+.link-setting {
+  margin-top: 10px;
+  padding: 10px 14px 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--activity);
+}
+.link-setting .sharing-toggle span:first-child { color: var(--ink); font-weight: 600; }
+.link-setting .sharing-toggle input { width: 1px; }
+.switch-track { flex: none; }
+.access-setting { display: grid; gap: 12px; justify-items: start; }
 .input-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; }
-.site-rules { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 15px; }
+.site-rules { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; }
 #rules-empty { margin-top: 12px; }
 #rules-list { padding: 0; list-style: none; margin: 8px 0 0; }
 #rules-list:empty { display: none; }

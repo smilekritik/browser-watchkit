@@ -7,6 +7,7 @@
   const videos = new Map();
   const roots = new Set();
   const topFrame = window === window.top;
+  const youtubeMusic = topFrame && location.hostname === "music.youtube.com";
   const yummyAnime = topFrame && location.hostname === "old.yummyani.me"
     && location.pathname.startsWith("/catalog/item/");
   const habster = topFrame && location.hostname === "habster.sbs" && /^\/series\/\d+\/?$/.test(location.pathname);
@@ -78,6 +79,7 @@
 
   function selected() {
     let result = null;
+    const musicVideo = youtubeMusic ? document.querySelector("ytmusic-player video.html5-main-video") : null;
     for (const [video, state] of videos) {
       if (!video.isConnected) {
         forget(video);
@@ -89,6 +91,7 @@
       const height = Math.max(0, Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0));
       const area = width * height;
       const featured = document.fullscreenElement === video || document.pictureInPictureElement === video;
+      if (video === musicVideo) return { video, state, score: 8_000_000 };
       if ((!area && !featured) || getComputedStyle(video).visibility !== "visible") continue;
       const score = Math.min(area, 1_000_000)
         + (!video.paused ? 2_000_000 : 0)
@@ -97,6 +100,16 @@
       if (!result || score > result.score) result = { video, state, score };
     }
     return result;
+  }
+
+  function musicTiming() {
+    const clock = document.querySelector("ytmusic-player-bar .time-info")?.textContent;
+    const times = /^\s*(\d+(?::[0-5]\d){1,2})\s*\/\s*(\d+(?::[0-5]\d){1,2})\s*$/.exec(clock ?? "");
+    if (!times) return null;
+    const seconds = time => time.split(":").reduce((total, part) => total * 60 + Number(part), 0);
+    const position = seconds(times[1]);
+    const duration = seconds(times[2]);
+    return duration > 0 && position <= duration ? { position, duration } : null;
   }
 
   const knownSites = {
@@ -145,6 +158,7 @@
   function snapshot({ video, state, score }) {
     const metadata = navigator.mediaSession?.metadata;
     const source = videoSource();
+    const timing = youtubeMusic && musicTiming();
     const vkEmbed = location.hostname === "vk.com" && location.pathname === "/video_ext.php";
     const videoPageTitle = vkEmbed || source === "VK Video" || source === "RUTUBE"
       ? document.querySelector('meta[property="og:title"]')?.content.trim() : "";
@@ -154,13 +168,13 @@
         || videoPageTitle || document.title || location.hostname || "Video";
     const media = {
       title: title.slice(0, 256),
-      source: vkEmbed ? "VK Video" : source,
+      source: youtubeMusic ? "YouTube Music" : vkEmbed ? "VK Video" : source,
       artwork: artwork(video, metadata, source),
-      position: video.currentTime,
-      duration: Number.isFinite(video.duration) ? video.duration : null,
+      position: timing?.position ?? video.currentTime,
+      duration: timing?.duration ?? (Number.isFinite(video.duration) ? video.duration : null),
       rate: video.playbackRate,
       state: video.paused ? "paused" : state.waiting ? "buffering" : "playing",
-      live: video.duration === Infinity,
+      live: !timing && video.duration === Infinity,
       score
     };
     if (alloha) {
@@ -201,7 +215,8 @@
     const episode = panel?.querySelector(".Y56k.pQCG")?.textContent.trim();
     return anime ? {
       source: "YummyAnime",
-      title: `${anime}${/^\d{1,4}$/.test(episode) ? ` · Episode ${episode}` : ""}`.slice(0, 256),
+      title: anime.slice(0, 256),
+      episode: /^\d{1,4}$/.test(episode) ? episode : undefined,
       artwork: artwork(null, null, "YummyAnime")
     } : null;
   }

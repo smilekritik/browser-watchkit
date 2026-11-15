@@ -120,7 +120,8 @@ int main()
                 } else {
                     active_id = id;
                     discord.update(std::move(id), addon::Activity{
-                        std::move(title), string_field(message, "detail"), string_field(message, "image")
+                        std::move(title), string_field(message, "detail"), string_field(message, "image"),
+                        string_field(message, "watchUrl")
                     });
                 }
             }

@@ -9,6 +9,7 @@
 namespace addon {
 struct Activity {
     std::string title, detail, image;
+    std::string watch_url;
     int type = 3;
     std::int64_t end = 0;
 };
