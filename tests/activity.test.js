@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { allowedPage, bestMedia, bridgeAdvice, toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
+import { allowedPage, bestMedia, bridgeAdvice, choosePlayback, defaultSettings,
+  toActivity, validId, watchLink, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
 const normalDigits = value => value.detail.normalize("NFKC");
@@ -122,6 +123,42 @@ test("matches the VLC episode label, rate digits and hour columns", () => {
 test("ignores stale frames and selects the strongest candidate", () => {
   const frame = (score, seenAt) => ({ media: { score }, seenAt });
   assert.equal(bestMedia([frame(10, 0), frame(3, 5000), frame(1, 6000)], 20_000).score, 3);
+});
+
+test("uses Listening for background video and for music on any tab", () => {
+  assert.equal(defaultSettings.backgroundPlayback, true);
+  const media = { ...paused, title: "Show S02E03", state: "playing" };
+  assert.equal(toActivity(media).activityType, 3);
+  const activity = toActivity(media, "", true);
+  assert.equal(activity.activityType, 2);
+  assert.equal(activity.title, "Show · S2 Ep.3");
+  for (const background of [false, true]) {
+    assert.equal(toActivity({ ...media, audio: true }, "", background).activityType, 2);
+  }
+});
+
+test("prefers playing foreground media and shows paused media only on the selected tab", () => {
+  const now = 30_000;
+  function tab(id, state, overrides = {}, seenAt = now) {
+    return { id, lastAccessed: id, audible: true, samples: new Map([[0, {
+      media: { ...paused, state, score: 1, ...overrides }, seenAt
+    }]]) };
+  }
+  const tabs = new Map([[1, tab(1, "playing")], [2, tab(2, "playing")], [3, tab(3, "playing")]]);
+  const choose = (previous = null) => choosePlayback(tabs, 1, previous, now);
+  assert.equal(choose(2).tab.id, 1);
+  assert.equal(choose(2).background, false);
+  tabs.set(1, tab(1, "paused"));
+  assert.equal(choose(2).tab.id, 2);
+  assert.equal(choose(2).background, true);
+  assert.equal(choose().tab.id, 3);
+  tabs.set(2, tab(2, "paused", { audio: true }));
+  tabs.set(3, tab(3, "playing", { muted: true }));
+  assert.equal(choose(2).tab.id, 1);
+  assert.equal(choose().media.state, "paused");
+  tabs.set(3, tab(3, "playing", {}, now - 16_001));
+  tabs.delete(1);
+  assert.equal(choose(), null);
 });
 
 test("filters excluded and restricted pages and validates the Discord ID", () => {

@@ -3,6 +3,7 @@ import { allWeb, byId, getRules, setRule } from "./preferences.js";
 
 const application = byId("application");
 const image = byId("image");
+const backgroundPlayback = byId("background-playback");
 const shareLink = byId("share-link");
 const discordNotice = byId("discord-notice");
 const rulesNotice = byId("rules-notice");
@@ -10,6 +11,7 @@ const allowAll = byId("allow-all");
 const saved = await chrome.storage.local.get(defaultSettings);
 application.value = saved.applicationId;
 image.value = browserArtworkKey(saved.image);
+backgroundPlayback.checked = saved.backgroundPlayback;
 shareLink.checked = saved.shareLink;
 
 byId("show-id").onclick = event => {
@@ -29,7 +31,8 @@ byId("config").onsubmit = async event => {
   }
   try {
     image.value = browserArtworkKey(image.value);
-    await chrome.storage.local.set({ applicationId, image: image.value, shareLink: shareLink.checked });
+    await chrome.storage.local.set({ applicationId, image: image.value,
+      backgroundPlayback: backgroundPlayback.checked, shareLink: shareLink.checked });
     discordNotice.textContent = "Settings saved.";
   } catch {
     discordNotice.textContent = "Could not save Discord settings.";

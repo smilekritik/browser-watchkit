@@ -12,7 +12,7 @@
 
 </div>
 
-WatchKit follows the selected Chrome tab. The Discord card shows the site, title, artwork when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
+WatchKit follows playback in Chrome, including music or video with sound in background tabs. The Discord card shows the site, title, artwork when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
 
 ## WatchKit for Chrome and VLC
 
@@ -61,7 +61,8 @@ If the card is missing, open Discord's **User Settings → Activity Privacy** an
 
 ## Use WatchKit
 
-- Switching tabs switches the activity. Selecting a tab without video clears it. Opening Discord or another app leaves the last selected Chrome tab as the source.
+- With **Settings → Discord → Share background playback** on by default, WatchKit shows music and videos with sound from background tabs as **Listening**. Playback on the selected tab takes priority when it is playing with sound. When playback is paused, its card can appear only on the selected tab. Turn off the setting and save to share only the selected tab.
+- Background playback uses the same website access and exclusion rules as the selected tab. Grant access once for each site you want to share. Chrome's speaker indicator helps WatchKit find background tabs with sound.
 - Open the popup on a website to **Pause until restart** or **Exclude site**. Manage both in **Settings → Website access → Excluded and paused sites**. A domain rule also covers its subdomains.
 - For local media, enable **Allow access to file URLs** in the extension's Chrome details and grant access from the popup. WatchKit uses `Local video` or `Local audio` as the activity title.
 - Press **Ctrl+Shift+Y** while Chrome is focused to turn tracking off across the browser and clear the Discord activity. Press it again to resume. The toolbar icon shows **OFF** while tracking is off, and WatchKit remembers the setting after Chrome restarts.
@@ -91,7 +92,7 @@ Spotify uses the [built-in Discord connection](https://support.discord.com/hc/en
 
 **Watch too** and **Listen too** let people who see your Discord activity open its media page. To hide the link, turn off **Watch too / Listen too button** under **Settings → Discord** and click **Save settings**. WatchKit shares HTTPS links with recognized media identifiers, such as the YouTube video ID, Bilibili part number or AniLiberty episode. If the player keeps the episode selection inside its frame, viewers can select the episode on the page. Discord only shows the button to other users. [Test Rich Presence buttons](https://docs.discord.com/developers/discord-social-sdk/development-guides/setting-rich-presence#setting-buttons)
 
-The extension saves your Discord application ID, artwork key, sharing preference, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets the extension follow page changes on the selected tab.
+The extension saves your Discord application ID, artwork key, sharing preferences, and site exclusions in this Chrome profile. It sends activity details to Discord desktop through the local bridge. It keeps no viewing history. Chrome's navigation permission lets it follow page changes in tabs it is tracking.
 
 WatchKit looks for public HTTPS artwork in the player's media metadata, the video poster, and preview tags on the page. For supported YouTube and Bilibili previews, Discord receives a wsrv.nl image URL with the original public thumbnail URL as a parameter. wsrv.nl fits the full image into a square with black padding as needed. Other previews use their original URL. WatchKit skips external artwork URLs that contain query strings, which can carry session or access tokens. If it finds no usable URL, it uses your optional fallback artwork key.
 

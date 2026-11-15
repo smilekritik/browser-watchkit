@@ -99,7 +99,9 @@
       const area = width * height;
       const featured = document.fullscreenElement === video || document.pictureInPictureElement === video;
       if (video === musicVideo) return { video, state, score: 8_000_000 };
-      if (!audio && !music && ((!area && !featured) || getComputedStyle(video).visibility !== "visible")) continue;
+      const audibleInBackground = document.hidden && !video.paused && !video.muted && video.volume > 0 && video.videoWidth > 0;
+      if (!audio && !music && !audibleInBackground
+          && ((!area && !featured) || getComputedStyle(video).visibility !== "visible")) continue;
       const score = Math.min(area, 1_000_000)
         + (!video.paused ? 2_000_000 : 0)
         + (!video.muted && video.volume > 0 ? 250_000 : 0)
@@ -259,6 +261,7 @@
       source: youtubeMusic ? "YouTube Music" : vkEmbed ? "VK Video" : source,
       artist: audio && location.protocol !== "file:" ? metadata?.artist?.trim().slice(0, 120) : undefined,
       audio,
+      muted: video.muted || video.volume === 0,
       artwork: artwork(video, metadata, youtubeMusic ? "YouTube" : source),
       position: timing?.position ?? video.currentTime,
       duration: timing?.duration ?? (Number.isFinite(video.duration) ? video.duration : null),
@@ -375,7 +378,7 @@
     const media = choice ? snapshot(choice) : null;
     const now = performance.now();
     const interval = media?.state === "playing" ? 5000 : 10000;
-    const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.artwork,
+    const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.muted, media.artwork,
       media.duration, media.rate, media.state, media.live, media.season, media.episode]);
     if (force || (media && (seeked || choice.video !== lastReport?.video
         || signature !== lastReport?.signature || now - sentAt >= interval))
@@ -423,6 +426,7 @@
     removeEventListener("resize", viewportChanged);
     removeEventListener("scroll", viewportChanged, true);
     document.removeEventListener("fullscreenchange", schedule);
+    document.removeEventListener("visibilitychange", schedule);
     document.removeEventListener("change", schedule);
     removeEventListener("pagehide", stop);
   }
@@ -436,6 +440,7 @@
     addEventListener("resize", viewportChanged, { passive: true });
     addEventListener("scroll", viewportChanged, { passive: true, capture: true });
     document.addEventListener("fullscreenchange", schedule);
+    document.addEventListener("visibilitychange", schedule);
     if (legacyLibria) document.addEventListener("change", schedule);
     addEventListener("pagehide", stop, { once: true });
     report(true);

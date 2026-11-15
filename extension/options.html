@@ -27,6 +27,14 @@
           <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off" aria-describedby="image-hint">
           <p class="hint" id="image-hint">Enter an Art Assets key from your Discord application to use when the video has no preview.</p>
           <div class="link-setting">
+            <label class="sharing-toggle" for="background-playback">
+              <span>Share background playback</span>
+              <input id="background-playback" type="checkbox" role="switch" aria-describedby="background-playback-hint">
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+            <p class="hint" id="background-playback-hint">Music and videos with sound from other tabs appear as Listening. Paused playback appears only for the selected tab.</p>
+          </div>
+          <div class="link-setting">
             <label class="sharing-toggle" for="share-link">
               <span>Watch too / Listen too button</span>
               <input id="share-link" type="checkbox" role="switch" aria-describedby="share-link-hint">

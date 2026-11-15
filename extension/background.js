@@ -1,10 +1,12 @@
-import { allowedPage, bestMedia, bridgeAdvice, defaultSettings, toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
+import { allowedPage, bridgeAdvice, choosePlayback, defaultSettings, sampleLifetime,
+  toActivity, validId, watchLink, withPageMetadata } from "./activity.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 let settings = defaultSettings;
 let pausedHosts = [];
-let current = null;
+const watches = new Map();
 let selectedTabId;
+let publishedTabId;
 let revision = 0;
 let bridge = null;
 let connection = "idle";
@@ -15,20 +17,22 @@ let lastPacket = "";
 let expiry;
 let badgeEnabled;
 let toggleSharing = Promise.resolve();
-const previousWatch = chrome.storage.session.get("watch").then(({ watch }) => {
-  if (watch) return chrome.tabs.sendMessage(watch.id, { type: "stop", token: watch.token }).catch(() => {});
-});
+const previousWatches = chrome.storage.session.get(["watch", "watches"]).then(async ({ watch, watches }) => {
+  await Promise.all((watches ?? (watch ? [watch] : [])).map(({ id, token }) =>
+    chrome.tabs.sendMessage(id, { type: "stop", token }).catch(() => {})));
+  if (watch || watches) await chrome.storage.session.remove(["watch", "watches"]);
+}).catch(console.error);
 
 async function attach(tab, frame) {
   try {
     const url = new URL(frame.url);
     const origin = url.protocol === "file:" ? "file:///*" : `${url.protocol}//${url.hostname}/*`;
-    if (!await chrome.permissions.contains({ origins: [origin] }) || tab !== current) return;
+    if (!await chrome.permissions.contains({ origins: [origin] }) || watches.get(tab.id) !== tab) return;
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, documentIds: [frame.documentId] },
       files: ["media.js"]
     });
-    if (tab !== current || tab.documents.get(frame.frameId) !== frame.documentId) return;
+    if (watches.get(tab.id) !== tab || tab.documents.get(frame.frameId) !== frame.documentId) return;
     await chrome.tabs.sendMessage(tab.id, { type: "watch", token: tab.token }, {
       documentId: frame.documentId
     });
@@ -37,13 +41,11 @@ async function attach(tab, frame) {
   }
 }
 
-function stopTracking() {
-  if (!current) return;
-  for (const documentId of current.documents.values()) {
-    chrome.tabs.sendMessage(current.id, { type: "stop", token: current.token }, { documentId }).catch(() => {});
+function stopTracking(tab) {
+  watches.delete(tab.id);
+  for (const documentId of tab.documents.values()) {
+    chrome.tabs.sendMessage(tab.id, { type: "stop", token: tab.token }, { documentId }).catch(() => {});
   }
-  current = null;
-  clearTimeout(expiry);
 }
 
 function clearPresence() {
@@ -62,7 +64,8 @@ function clearPresence() {
   }
 }
 
-function publish(activity) {
+function publish(view) {
+  const { activity, url } = view ?? {};
   if (!activity) {
     clearPresence();
     return;
@@ -91,7 +94,7 @@ function publish(activity) {
   }
   const { linkEpisode, ...presence } = activity;
   const message = { type: "activity", applicationId: settings.applicationId, ...presence };
-  const link = settings.shareLink ? watchLink(current?.url, linkEpisode) : "";
+  const link = settings.shareLink ? watchLink(url, linkEpisode) : "";
   if (link) message.watchUrl = link;
   const packet = JSON.stringify(message);
   if (packet === lastPacket) return;
@@ -109,58 +112,88 @@ function publish(activity) {
 }
 
 function preview() {
-  if (!current) return null;
-  const media = bestMedia(current.samples.values(), Date.now());
-  return toActivity(withPageMetadata(media, current.pageMetadata), settings.image);
+  const choice = choosePlayback(watches, selectedTabId, publishedTabId, Date.now());
+  if (!choice) return null;
+  const { tab, media, background } = choice;
+  const activity = toActivity(withPageMetadata(media, tab.pageMetadata), settings.image, background);
+  return { activity, background, url: tab.url, tabId: tab.id };
 }
 
 function updatePresence() {
   clearTimeout(expiry);
   const now = Date.now();
   let next = Infinity;
-  for (const [frameId, sample] of current.samples) {
-    const expiresAt = sample.seenAt + 16_000;
-    if (expiresAt <= now) current.samples.delete(frameId);
-    else next = Math.min(next, expiresAt);
+  for (const tab of watches.values()) {
+    for (const [frameId, sample] of tab.samples) {
+      const expiresAt = sample.seenAt + sampleLifetime;
+      if (expiresAt <= now) tab.samples.delete(frameId);
+      else next = Math.min(next, expiresAt);
+    }
   }
   if (Number.isFinite(next)) expiry = setTimeout(updatePresence, next - now);
-  publish(preview());
+  const view = preview();
+  publishedTabId = view?.tabId;
+  publish(view);
 }
 
 async function refresh(force = false) {
   const generation = ++revision;
-  await previousWatch;
-  const [[tab], stored, session] = await Promise.all([
+  await previousWatches;
+  const [[selected], stored, session] = await Promise.all([
     chrome.tabs.query({ active: true, lastFocusedWindow: true, windowType: "normal" }),
     chrome.storage.local.get(defaultSettings),
     chrome.storage.session.get({ pausedHosts: [] })
   ]);
+  const enabled = stored.enabled && validId(stored.applicationId);
+  const background = enabled && stored.backgroundPlayback ? await chrome.tabs.query({ audible: true, windowType: "normal" }) : [];
   if (generation !== revision) return;
-  selectedTabId = tab?.id;
-  const changed = stored.applicationId !== settings.applicationId || stored.image !== settings.image;
+  selectedTabId = selected?.id;
+  const changedId = stored.applicationId !== settings.applicationId;
   settings = stored;
   if (badgeEnabled !== settings.enabled) {
     badgeEnabled = settings.enabled;
     void chrome.action.setBadgeText({ text: badgeEnabled ? "" : "OFF" }).catch(console.error);
   }
   pausedHosts = session.pausedHosts;
-  const eligible = settings.enabled && validId(settings.applicationId) && tab?.id != null
-    && !tab.incognito && allowedPage(tab.url, [...settings.blockedHosts, ...pausedHosts]);
-  if (!eligible || force || changed || current?.id !== tab.id || current.url !== tab.url) {
-    stopTracking();
-    clearPresence();
+  if (changedId) clearPresence();
+  const rules = [...settings.blockedHosts, ...pausedHosts];
+  const eligible = new Map();
+  if (enabled) {
+    for (const tab of [selected, ...background.filter(tab => tab.id !== selectedTabId && !tab.mutedInfo?.muted)]) {
+      if (tab?.id != null && !tab.incognito && !tab.discarded && allowedPage(tab.url, rules)) eligible.set(tab.id, tab);
+    }
   }
-  if (!eligible) {
-    await chrome.storage.session.remove("watch");
-    return;
+  let changed = false;
+  for (const tab of watches.values()) {
+    if (force || eligible.get(tab.id)?.url !== tab.url) {
+      stopTracking(tab);
+      changed = true;
+    }
   }
-  if (current) return;
+  for (const tab of eligible.values()) {
+    let target = watches.get(tab.id);
+    if (!target) {
+      target = { id: tab.id, url: tab.url, token: crypto.randomUUID(), documents: new Map(), samples: new Map() };
+      watches.set(tab.id, target);
+      changed = true;
+      void startTracking(target);
+    }
+    target.audible = tab.audible;
+    target.muted = tab.mutedInfo?.muted;
+    target.lastAccessed = tab.lastAccessed ?? 0;
+  }
+  if (changed) void saveWatches();
+  updatePresence();
+}
 
-  const target = { id: tab.id, url: tab.url, token: crypto.randomUUID(), documents: new Map(), samples: new Map() };
-  current = target;
-  await chrome.storage.session.set({ watch: { id: target.id, token: target.token } });
-  const frames = await chrome.webNavigation.getAllFrames({ tabId: tab.id }).catch(() => null);
-  if (current !== target || !frames) return;
+function saveWatches() {
+  const entries = [...watches.values()].map(({ id, token }) => ({ id, token }));
+  return chrome.storage.session.set({ watches: entries }).catch(console.error);
+}
+
+async function startTracking(target) {
+  const frames = await chrome.webNavigation.getAllFrames({ tabId: target.id }).catch(() => null);
+  if (watches.get(target.id) !== target || !frames) return;
   for (const frame of frames) {
     if (target.documents.has(frame.frameId)) continue;
     watchFrame(target, frame);
@@ -186,54 +219,71 @@ chrome.commands.onCommand.addListener(command => {
 });
 chrome.tabs.onActivated.addListener(() => scheduleRefresh(false));
 chrome.tabs.onUpdated.addListener((id, info) => {
-  if (id === selectedTabId && info.url) scheduleRefresh(false);
+  const pageChanged = (id === selectedTabId || watches.has(id))
+    && (info.url !== undefined || info.discarded !== undefined);
+  const audioChanged = (id === selectedTabId || settings.backgroundPlayback)
+    && (info.audible !== undefined || info.mutedInfo !== undefined);
+  if (pageChanged || audioChanged) scheduleRefresh(false);
 });
-chrome.tabs.onRemoved.addListener(id => {
-  if (id !== current?.id) return;
-  stopTracking();
-  clearPresence();
+
+function tabRemoved(id) {
+  const tab = watches.get(id);
+  if (tab) {
+    stopTracking(tab);
+    void saveWatches();
+    updatePresence();
+  }
+  if (!tab && id !== selectedTabId) return;
   scheduleRefresh(false);
-});
+}
+
+chrome.tabs.onRemoved.addListener(tabRemoved);
+chrome.tabs.onReplaced.addListener((_, removedId) => tabRemoved(removedId));
 chrome.windows.onFocusChanged.addListener(id => {
   if (id !== chrome.windows.WINDOW_ID_NONE) scheduleRefresh(false);
 });
 chrome.webNavigation.onCommitted.addListener(frame => {
-  if (frame.tabId !== current?.id) return;
-  if (frame.frameId === 0) {
-    stopTracking();
-    clearPresence();
-    scheduleRefresh(false);
+  const tab = watches.get(frame.tabId);
+  if (!tab) {
+    if (frame.frameId === 0 && frame.tabId === selectedTabId) scheduleRefresh(false);
     return;
   }
-  if (current.samples.delete(frame.frameId)) updatePresence();
-  watchFrame(current, frame);
+  if (frame.frameId === 0) {
+    tabRemoved(frame.tabId);
+    return;
+  }
+  if (tab.samples.delete(frame.frameId)) updatePresence();
+  watchFrame(tab, frame);
 });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" || (area === "session" && changes.pausedHosts)) scheduleRefresh(true);
+  if (area === "local") scheduleRefresh(Boolean(changes.blockedHosts));
+  if (area === "session" && changes.pausedHosts) scheduleRefresh(true);
 });
 chrome.permissions.onAdded.addListener(() => scheduleRefresh(true));
 chrome.permissions.onRemoved.addListener(() => scheduleRefresh(true));
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type === "status" && sender.url === chrome.runtime.getURL("popup.html")) {
     const waiting = connection === "connecting" && Date.now() - connectingSince >= 5000;
-    reply({ connection: waiting ? "waiting" : connection, connectionHint, activity: preview() });
+    const view = preview();
+    reply({ connection: waiting ? "waiting" : connection, connectionHint,
+      activity: view?.activity, background: view?.background });
     return;
   }
   if (!["media", "page-metadata"].includes(message?.type)) return;
-  const matches = current && sender.tab?.id === current.id && message.token === current.token
-    && current.documents.get(sender.frameId) === sender.documentId;
+  const tab = watches.get(sender.tab?.id);
+  const matches = tab && message.token === tab.token && tab.documents.get(sender.frameId) === sender.documentId;
   if (!matches) {
     reply({ watching: false });
     return;
   }
   if (message.type === "page-metadata") {
     if (sender.frameId !== 0) return;
-    current.pageMetadata = message.page;
+    tab.pageMetadata = message.page;
     updatePresence();
     return;
   }
-  if (message.media) current.samples.set(sender.frameId, { media: message.media, seenAt: Date.now() });
-  else current.samples.delete(sender.frameId);
+  if (message.media) tab.samples.set(sender.frameId, { media: message.media, seenAt: Date.now() });
+  else tab.samples.delete(sender.frameId);
   updatePresence();
   reply({ watching: true });
 });

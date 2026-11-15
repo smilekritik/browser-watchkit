@@ -35,12 +35,14 @@ async function refresh() {
   const pausedBy = matchingHost(host, paused);
   const granted = origin && await chrome.permissions.contains({ origins: [origin] });
   const spotify = isSpotify(host);
-  const canTrack = validId(config.applicationId) && config.enabled && currentRule && granted
-    && !spotify && !excludedBy && !pausedBy;
+  const background = Boolean(reply?.background && reply.activity);
+  const canTrack = background || (validId(config.applicationId) && config.enabled && currentRule && granted
+    && !spotify && !excludedBy && !pausedBy);
   enabled.checked = config.enabled;
   byId("setup-row").hidden = validId(config.applicationId);
   byId("status").textContent = !validId(config.applicationId) ? "Connect Discord to get started"
     : !config.enabled ? "Sharing is off"
+    : background ? stateText[reply.connection] ?? stateText.idle
     : spotify ? "Spotify uses Discord’s own connection"
     : excludedBy ? "This site is excluded"
     : pausedBy ? "This site is paused"
@@ -55,6 +57,7 @@ async function refresh() {
     idle: "Start playback in this tab. If the player is embedded from another site, allow its domain in Chrome."
   }[reply?.connection ?? "idle"] ?? "") : "";
   help.hidden = !help.textContent;
+  byId("playback-origin").hidden = !background;
   byId("video").textContent = reply?.activity?.title ?? "";
   byId("timing").textContent = reply?.activity?.detail ?? "";
   if (!currentRule) return;

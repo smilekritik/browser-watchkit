@@ -2,6 +2,7 @@ export const defaultSettings = {
   enabled: false,
   applicationId: "",
   blockedHosts: [],
+  backgroundPlayback: true,
   shareLink: true,
   image: ""
 };
@@ -126,7 +127,7 @@ export function browserArtworkKey(image) {
   return image.trim().toLowerCase() === "vlc" ? "" : image.trim();
 }
 
-export function toActivity(media, image = "") {
+export function toActivity(media, image = "", background = false) {
   if (!media || !["playing", "paused", "buffering"].includes(media.state)
       || !Number.isFinite(media.position) || media.position < 0
       || !Number.isFinite(media.rate) || media.rate <= 0) {
@@ -184,7 +185,7 @@ export function toActivity(media, image = "") {
   title ||= audio ? "Audio" : "Video";
   if (media.source) title = `${media.source} · ${title}`;
   return {
-    activityType: audio ? 2 : 3,
+    activityType: audio || background ? 2 : 3,
     linkEpisode: media.linkEpisode,
     title: `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}${media.state === "paused" ? " · ⏸\ufe0e" : ""}`,
     detail: detail.replace(/\d/g, digit => String.fromCodePoint(0x1d7f6 + Number(digit))),
@@ -192,13 +193,34 @@ export function toActivity(media, image = "") {
   };
 }
 
-export function bestMedia(frames, now) {
+export const sampleLifetime = 16_000;
+
+export function bestMedia(frames, now, background = false) {
   let best = null;
   for (const frame of frames) {
-    if (!frame.media || now - frame.seenAt > 16_000) continue;
+    if (!frame.media || now - frame.seenAt >= sampleLifetime) continue;
+    if (background && (frame.media.state === "paused" || frame.media.muted)) continue;
     if (!best || frame.media.score > best.media.score) best = frame;
   }
   return best?.media ?? null;
+}
+
+export function choosePlayback(tabs, activeTabId, previousTabId, now) {
+  const activeTab = tabs.get(activeTabId);
+  const activeMedia = activeTab && bestMedia(activeTab.samples.values(), now);
+  const foreground = activeMedia ? { tab: activeTab, media: activeMedia, background: false } : null;
+  if (foreground && activeMedia.state !== "paused" && !activeMedia.muted && !activeTab.muted) return foreground;
+
+  let background = null;
+  for (const tab of tabs.values()) {
+    if (tab.id === activeTabId || !tab.audible || tab.muted) continue;
+    const media = bestMedia(tab.samples.values(), now, true);
+    if (!media) continue;
+    const candidate = { tab, media, background: true };
+    if (tab.id === previousTabId) return candidate;
+    if (!background || tab.lastAccessed > background.tab.lastAccessed) background = candidate;
+  }
+  return background ?? foreground;
 }
 
 const pagePlayers = new Map([
