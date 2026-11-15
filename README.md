@@ -94,6 +94,8 @@ WatchKit looks for public HTTPS artwork in the player's media metadata, the vide
 
 To update, turn sharing off and close Chrome. Extract the new release and copy its files into the original folder, replacing the older files. Double-click **Install WatchKit.bat**, then open Chrome and click **Reload** on the WatchKit card at `chrome://extensions`. Refresh any video tab you had open. Keeping the original extension folder preserves its settings.
 
+You can also use **Reload extension** in WatchKit settings after replacing the extension files. Save pending settings first, then refresh the playback tab after WatchKit reloads.
+
 To remove it, close Chrome, unblock and run `./scripts/uninstall.ps1` from the release folder, then remove WatchKit in `chrome://extensions`.
 
 ## Troubleshooting

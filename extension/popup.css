@@ -108,7 +108,8 @@ a { color: var(--accent); text-underline-offset: 3px; }
 
 .options { padding: clamp(24px, 7vh, 76px) clamp(15px, 4vw, 36px); }
 .options main { max-width: 980px; margin-inline: auto; }
-.page-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+.page-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 26px; }
+.page-heading-title { display: flex; align-items: center; gap: 14px; }
 .page-heading h1 { font-size: clamp(24px, 4vw, 37px); letter-spacing: -.035em; line-height: 1.2; }
 .page-heading .icon { width: 27px; height: 27px; color: var(--accent); --icon-background: var(--background); }
 .preferences { display: grid; gap: 18px; align-items: start; }

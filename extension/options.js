@@ -132,6 +132,7 @@ const shortcut = commands.find(command => command.name === "toggle-sharing")?.sh
 byId("shortcut-key").textContent = shortcut ?? "";
 byId("shortcut-key").hidden = !shortcut;
 byId("shortcut-settings").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
+byId("reload-extension").onclick = () => chrome.runtime.reload();
 chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "local" && changes.blockedHosts) || (area === "session" && changes.pausedHosts)) void updateRules();
 });
