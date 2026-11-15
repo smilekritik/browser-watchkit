@@ -63,6 +63,16 @@ test("shares only the direct TikTok clip and preserves captions containing episo
   assert.equal(result.title, "TikTok · Author — Edit S2E7");
 });
 
+test("shares a canonical Instagram Reel without disclosing the feed or tracking parameters", () => {
+  const reel = "https://www.instagram.com/reel/Dd1gQBsCWE8/";
+  assert.equal(watchLink("https://www.instagram.com/nasa/reel/Dd1gQBsCWE8/?igsh=private#fragment"), reel);
+  assert.equal(watchLink("https://instagram.com/reels/Dd1gQBsCWE8/embed/captioned/"), reel);
+  assert.equal(watchLink("https://www.instagram.com/reels/"), "");
+  assert.equal(watchLink("https://www.instagram.com/nasa/reels/"), "");
+  const result = toActivity({ ...paused, source: "Instagram", title: "@creator — Edit S2E7", state: "playing" });
+  assert.equal(result.title, "Instagram · @creator — Edit S2E7");
+});
+
 test("retains video and episode identifiers across link formats", () => {
   const links = [
     ["https://rt.pornhub.com/view_video.php?viewkey=ph123abc&utm_source=example",

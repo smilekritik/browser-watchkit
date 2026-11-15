@@ -87,6 +87,9 @@ export function watchLink(value, linkEpisode) {
     keep("p", /^[1-9]\d{0,3}$/);
   } else if (matchingHost(host, ["tiktok.com"])) {
     if (!/^\/@[\w.]{1,32}\/video\/\d{15,22}$/.test(path)) return "";
+  } else if (matchingHost(host, ["instagram.com"])) {
+    const reelId = /^\/(?:[\w.]{1,30}\/)?reels?\/([\w-]{5,32})(?:\/embed(?:\/captioned)?)?$/.exec(path)?.[1];
+    return reelId ? "https://www.instagram.com/reel/" + reelId + "/" : "";
   } else if (matchingHost(host, ["anilibria.tv", "anilibria.uno"]) && /^\/release\/[\w-]+\.html$/.test(path)) {
     if (/^[1-9]\d{0,3}$/.test(linkEpisode)) page.hash = `play-s${linkEpisode}`;
   } else if (/\/(?:watch|view_video|videos?|player|play|embed|series|episode|episodes)(?:[/.]|$)/i.test(path)) {
@@ -173,7 +176,7 @@ export function toActivity(media, image = "", background = false) {
     ? media.title.replace(/[\u0000-\u001f\u007f]/g, " ").trim()
     : "";
   const audio = media.audio === true;
-  const episodic = !audio && media.source !== "TikTok";
+  const episodic = !audio && media.source !== "TikTok" && media.source !== "Instagram";
   const episode = episodic && /^(.*?)[\s._-]*s(\d{1,2})[\s._-]*e(\d{1,3})(?=$|[\s._\[\]()-])(.*)$/i.exec(title);
   const spelledOut = episodic && (
     /^(.*?)\s*(?:[·|–—]|\s-)\s*Season\s+(\d{1,4}),?\s+Episode\s+(\d{1,4})$/i.exec(title)

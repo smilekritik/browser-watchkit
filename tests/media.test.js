@@ -114,6 +114,42 @@ test("reads the selected TikTok clip's caption, author, signed cover and permali
   assert.equal(track("https://www.tiktok.com/", options).clipUrl, "");
 });
 
+test("reads Instagram Reel metadata only from the active Reel", () => {
+  const reel = "https://www.instagram.com/reel/Dd1gQBsCWE8/";
+  const cover = "https://scontent-iev1-1.cdninstagram.com/v/t51.82787-15/825320801_n.jpg"
+    + "?stp=c1&ccb=7-5&_nc_ohc=signed&oh=sig&oe=6A01";
+  const head = url => ({
+    'meta[property="og:url"]': { content: url },
+    'meta[property="og:title"]': { content: 'NASA on Instagram: "What happens next?"' },
+    'meta[property="og:image"]': { content: cover }
+  });
+  const direct = track(reel, { top: true, selectors: head("https://www.instagram.com/nasa/reel/Dd1gQBsCWE8/") });
+  assert.equal(direct.source, "Instagram");
+  assert.equal(direct.title, "NASA — What happens next?");
+  assert.equal(direct.artwork, cover);
+  assert.equal(direct.clipUrl, reel);
+  assert.equal(direct.position, 20);
+
+  const second = "https://www.instagram.com/reel/Deb2Next_ID/";
+  const container = {
+    matches: () => false,
+    querySelectorAll: selector => selector === "video" ? [{}] : [{ href: second + "?igsh=private" }],
+    querySelector: selector => selector.includes("post-caption")
+      ? { textContent: "Next video S2E7" } : new URL("https://www.instagram.com/creator/")
+  };
+  const feed = track("https://www.instagram.com/reels/", {
+    top: true, selectors: head(reel), media: { parentElement: container, poster: cover + "&token=private" }
+  });
+  assert.equal(feed.title, "@creator — Next video S2E7");
+  assert.equal(feed.clipUrl, second);
+  assert.equal(feed.artwork, "");
+
+  const stale = track(second, { top: true, selectors: head(reel) });
+  assert.equal(stale.title, "Reel");
+  assert.equal(stale.artwork, "");
+  assert.equal(track("https://www.instagram.com/reels/", { top: true, selectors: head(reel) }).clipUrl, "");
+});
+
 test("reads Alloha's selected controls and Collaps's current episode title", () => {
   const alloha = track("https://befriend.stravers.live/", { selectors: {
     '[data-select="seasonType1"] .select__item .select__item-text': { textContent: "Сезон 2" },

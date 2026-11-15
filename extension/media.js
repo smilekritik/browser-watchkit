@@ -10,6 +10,7 @@
   const audioFile = /\.(?:aac|flac|m4a|mp3|oga|opus|wav)$/i.test(location.pathname);
   const youtubeMusic = topFrame && location.hostname === "music.youtube.com";
   const tiktok = /(?:^|\.)tiktok\.com$/.test(location.hostname);
+  const instagram = /^(?:www\.)?instagram\.com$/.test(location.hostname);
   const legacyLibria = topFrame && /^(?:www\.)?anilibria\.(?:tv|uno)$/.test(location.hostname);
   const libria = topFrame && /^(?:www\.)?(?:anilibria|aniliberty)\.(?:top|wtf)$/.test(location.hostname);
   const yummyAnime = topFrame && location.hostname === "old.yummyani.me"
@@ -25,7 +26,7 @@
       for (const node of change.addedNodes) changed = scan(node) || changed;
       if (change.removedNodes.length && videos.size) changed = true;
     }
-    if (changed || yummyAnime || habster || legacyLibria || ((alloha || collaps || tiktok) && videos.size)) schedule();
+    if (changed || yummyAnime || habster || legacyLibria || ((alloha || collaps || tiktok || instagram) && videos.size)) schedule();
   });
   let token;
   let queued;
@@ -159,7 +160,7 @@
   };
   const knownSites = {
     "youtube.com": "YouTube", "youtube-nocookie.com": "YouTube", "youtu.be": "YouTube",
-    "twitch.tv": "Twitch", "tiktok.com": "TikTok", "bilibili.com": "Bilibili",
+    "twitch.tv": "Twitch", "tiktok.com": "TikTok", "instagram.com": "Instagram", "bilibili.com": "Bilibili",
     "netflix.com": "Netflix", "vimeo.com": "Vimeo", "primevideo.com": "Prime Video",
     "disneyplus.com": "Disney+", "crunchyroll.com": "Crunchyroll",
     "vkvideo.ru": "VK Video", "rutube.ru": "RUTUBE", "kick.com": "Kick",
@@ -305,6 +306,64 @@
     };
   }
 
+  function instagramReelId(value) {
+    if (!value) return "";
+    try {
+      const url = new URL(value, document.baseURI);
+      if (url.origin !== location.origin) return "";
+      return /^\/(?:[\w.]{1,30}\/)?reels?\/([\w-]{5,32})(?:\/embed(?:\/captioned)?)?\/?$/.exec(url.pathname)?.[1] ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function instagramCover(candidate) {
+    const publicUrl = publicArtwork(candidate);
+    if (publicUrl || !candidate) return publicUrl;
+    try {
+      const url = new URL(candidate, document.baseURI);
+      const field = /^(?:stp|ccb|efg|oh|oe|_nc_(?:cat|map|sid|ohc|oc|zt|ht|gid|ss|ct|rid|ad))$/;
+      if (url.protocol === "https:" && /^scontent(?:-[a-z\d]+)*\.cdninstagram\.com$|^instagram(?:\.[a-z\d-]+)?\.fna\.fbcdn\.net$/i.test(url.hostname)
+          && /^\/v\/t[\d.]+-\d+\/[\w.-]+\.(?:jpe?g|png|webp)$/i.test(url.pathname)
+          && !url.username && !url.password && !url.port && !url.hash && url.href.length <= 768
+          && url.searchParams.has("oh") && url.searchParams.has("oe")
+          && [...url.searchParams.keys()].every(key => field.test(key))) return url.href;
+    } catch {
+      // Ignore malformed image URLs.
+    }
+    return "";
+  }
+
+  function instagramDetails(video) {
+    const routeId = instagramReelId(location.href);
+    let id = "";
+    let caption = "";
+    let author = "";
+    for (let card = video.parentElement, depth = 0; card && depth < 12; card = card.parentElement, depth++) {
+      if (card.matches("main, body") || card.querySelectorAll("video").length > 1) break;
+      const links = card.querySelectorAll('a[href*="/reel/"], a[href*="/reels/"]');
+      const ids = new Set([...links].map(link => instagramReelId(link.href)).filter(Boolean));
+      if (!id && ids.size === 1) id = ids.values().next().value;
+      caption ||= card.querySelector('[data-testid="post-caption"], h1')?.textContent.trim() || "";
+      const profile = card.querySelector('header a[href], a.CaptionUsername');
+      const handle = /^\/([\w.]{1,30})\/?$/.exec(profile?.pathname ?? "")?.[1];
+      if (!author && handle && profile.origin === location.origin) author = "@" + handle;
+      if (id && caption && author) break;
+    }
+    id ||= routeId;
+    if (!id && !/^\/(?:[\w.]{1,30}\/)?reels\/?$/.test(location.pathname)) return null;
+    const meta = name => document.querySelector('meta[property="og:' + name + '"]')?.content;
+    const pageMatches = Boolean(id && id === routeId && instagramReelId(meta("url")) === id);
+    const head = pageMatches && /^(.+?) on Instagram:\s*["“](.*)["”]\s*$/isu.exec(meta("title") ?? "");
+    author ||= head?.[1]?.trim() || "";
+    caption ||= head?.[2]?.trim() || "";
+    return {
+      title: [author, caption].filter(Boolean).join(" — ").slice(0, 256) || "Reel",
+      artwork: instagramCover(video.poster) || (pageMatches ? instagramCover(meta("image")) : ""),
+      clipUrl: id ? "https://www.instagram.com/reel/" + id + "/" : ""
+    };
+  }
+
   function episodeCover() {
     const path = location.pathname.replace(/\/$/, "");
     const segments = path.split("/").filter(Boolean);
@@ -332,6 +391,7 @@
     const music = audioSource();
     const audio = Boolean(music) || video instanceof HTMLAudioElement || audioFile;
     const source = music || videoSource();
+    const reel = instagram && !audio ? instagramDetails(video) : null;
     const timing = youtubeMusic && musicTiming();
     const vkEmbed = location.hostname === "vk.com" && location.pathname === "/video_ext.php";
     const videoPageTitle = vkEmbed || source === "VK Video" || source === "RUTUBE"
@@ -346,18 +406,19 @@
       : metadata?.title || video.getAttribute("title")
         || videoPageTitle || document.title || location.hostname || (audio ? "Audio" : "Video");
     const media = {
-      title: title.slice(0, 256),
+      title: reel?.title ?? title.slice(0, 256),
       source: youtubeMusic ? "YouTube Music" : vkEmbed ? "VK Video" : source,
       artist: audio && location.protocol !== "file:" ? metadata?.artist?.trim().slice(0, 120) : undefined,
       audio,
       muted: video.muted || video.volume === 0,
-      artwork: artwork(video, metadata, youtubeMusic ? "YouTube" : source),
+      artwork: reel?.artwork ?? artwork(video, metadata, youtubeMusic ? "YouTube" : source),
       position: timing?.position ?? video.currentTime,
       duration: timing?.duration ?? (Number.isFinite(video.duration) ? video.duration : null),
       rate: video.playbackRate,
       state: video.paused ? "paused" : state.waiting ? "buffering" : "playing",
       live: !timing && video.duration === Infinity,
-      score
+      score,
+      clipUrl: reel?.clipUrl
     };
     if (tiktok && !audio) Object.assign(media, tiktokDetails(video, metadata));
     if (localPlayer) {
@@ -545,11 +606,11 @@
     token = message.token;
     episodePage = topFrame && message.episodePage === true;
     observe(document);
-    if (episodePage && document.head) {
+    if ((episodePage || (instagram && topFrame)) && document.head) {
       titleObserver.observe(document.head, { childList: true, subtree: true, characterData: true,
         attributes: true, attributeFilter: ["content"] });
-      document.addEventListener("load", coverLoaded, true);
     }
+    if (episodePage) document.addEventListener("load", coverLoaded, true);
     addEventListener("resize", viewportChanged, { passive: true });
     addEventListener("scroll", viewportChanged, { passive: true, capture: true });
     document.addEventListener("fullscreenchange", schedule);

@@ -72,7 +72,11 @@ If the card is missing, open Discord's **User Settings → Activity Privacy** an
 
 WatchKit detects accessible HTML video and audio, including players in frames that Chrome allows it to read. Playback that only uses Web Audio or an inaccessible player may not be detected. Chrome internal pages and incognito windows are outside its scope.
 
-Installed Chrome web apps can also share playback when they use the same Chrome profile and the site is allowed in WatchKit.
+### Installed Chrome web apps
+
+Install WatchKit in the Chrome profile you used to install the web app. The app window uses that profile's extension and website access settings. To check access, open the same site in a regular tab and look for **Access allowed** in the WatchKit popup.
+
+After updating WatchKit, open its settings and click **Reload extension**, then refresh the app with **Ctrl+R**. Start a video in the app window. Keep **Share background playback** enabled if you want WatchKit to keep sharing while the app plays with sound behind another Chrome window.
 
 ### Music, podcasts and radio
 
