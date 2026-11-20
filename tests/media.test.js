@@ -174,7 +174,11 @@ test("reads the selected TikTok clip's caption, author, signed cover and permali
       ? { id: "xgwrapper-0-7707755453681323286" } : { querySelector: selector => selector.startsWith("img") ? poster : null } }
   };
   const sample = track(url, options);
-  assert.equal(sample.title, "Wait_FoxsE — Посадила. Вырастила. Собрала урожай.");
+  assert.equal(sample.creator, "Wait_FoxsE");
+  assert.equal(sample.title, "Посадила. Вырастила. Собрала урожай.");
+  const activity = toActivity({ ...sample, sampledAt: 1_800_000_000_000 });
+  assert.equal(activity.discordTitle, "TikTok · Wait_FoxsE");
+  assert.equal(activity.discordState, sample.title);
   assert.equal(sample.artwork, coverUrl);
   assert.equal(sample.clipUrl, url);
   assert.equal(sample.position, 20);
@@ -183,7 +187,7 @@ test("reads the selected TikTok clip's caption, author, signed cover and permali
   poster.currentSrc = coverUrl.replace("tiktokcdn.com", "tiktokcdn.com.example.com");
   assert.equal(track(url, options).artwork, "");
   options.selectors = {};
-  assert.equal(track(url, options).title, "@user_play_opera.haus — Посадила. Вырастила. Собрала урожай.");
+  assert.equal(track(url, options).creator, "@user_play_opera.haus");
   const video = options.media;
   const feed = track("https://www.tiktok.com/", { ...options, media: {
     closest: selector => selector.includes("xgwrapper") ? video.closest(selector)
@@ -204,7 +208,8 @@ test("reads Instagram Reel metadata only from the active Reel", () => {
   });
   const direct = track(reel, { top: true, selectors: head("https://www.instagram.com/nasa/reel/Dd1gQBsCWE8/") });
   assert.equal(direct.source, "Instagram");
-  assert.equal(direct.title, "NASA — What happens next?");
+  assert.equal(direct.creator, "NASA");
+  assert.equal(direct.title, "What happens next?");
   assert.equal(direct.artwork, cover);
   assert.equal(direct.clipUrl, reel);
   assert.equal(direct.position, 20);
@@ -219,7 +224,8 @@ test("reads Instagram Reel metadata only from the active Reel", () => {
   const feed = track("https://www.instagram.com/reels/", {
     top: true, selectors: head(reel), media: { parentElement: container, poster: cover + "&token=private" }
   });
-  assert.equal(feed.title, "@creator — Next video S2E7");
+  assert.equal(feed.creator, "@creator");
+  assert.equal(feed.title, "Next video S2E7");
   assert.equal(feed.clipUrl, second);
   assert.equal(feed.artwork, "");
 
@@ -256,14 +262,18 @@ test("uses the largest square YouTube Music cover without adding padding", () =>
 test("uses the YouTube Music player clock for position, duration and time left", () => {
   const url = "https://music.youtube.com/watch?v=J63aZNuoRek";
   const media = { currentTime: 202, duration: 302 };
-  const sample = track(url, { title: "Observing Medley", top: true, media, selectors: {
+  const sample = track(url, { title: "Observing Medley", top: true, media, metadata: { artist: "Mea Kagura" }, selectors: {
     "ytmusic-player-bar .time-info": { textContent: " 0:37 / 3:30 " }
   } });
   assert.equal(sample.source, "YouTube Music");
-  assert.equal(toActivity(sample).activityType, 2);
+  const activity = toActivity({ ...sample, sampledAt: 1_800_000_000_000 });
+  assert.equal(activity.activityType, 2);
   assert.equal(sample.position, 37);
   assert.equal(sample.duration, 210);
-  assert.equal(toActivity(sample).detail, "00:37 / 03:30");
+  assert.equal(activity.detail, "00:37 / 03:30");
+  assert.equal(activity.discordTitle, "YouTube Music · Mea Kagura");
+  assert.equal(activity.discordState, "Observing Medley");
+  assert.equal(activity.end - activity.start, 210);
   assert.equal(track(url, { top: true, media }).duration, 302);
 });
 

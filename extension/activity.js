@@ -220,9 +220,8 @@ export function toActivity(media, image = "", background = false) {
     const seasonLabel = /^\d{1,4}$/.test(seasonNumber) ? `S${Number(seasonNumber)} ` : "";
     episodeSuffix = ` · ${seasonLabel}Ep.${Number(episodeNumber)}`;
   }
-  const artist = audio && typeof media.artist === "string"
-    ? media.artist.replace(/[\u0000-\u001f\u007f]/g, " ").trim() : "";
-  if (artist && title && title !== artist) title = `${artist} — ${title}`;
+  const credit = media.creator || media.artist;
+  const creator = typeof credit === "string" ? credit.replace(/[\u0000-\u001f\u007f]/g, " ").trim() : "";
   const duration = playbackDuration(media);
   let detail;
   if (media.live) {
@@ -234,13 +233,15 @@ export function toActivity(media, image = "", background = false) {
   }
   if (media.rate !== 1) detail += ` · Speed ${media.rate}×`;
   if (media.state === "buffering") detail += " · Buffering";
-  title ||= audio ? "Audio" : "Video";
-  if (media.source) title = `${media.source} · ${title}`;
+  let summary = title || creator || (audio ? "Audio" : "Video");
+  if ((audio || media.creator) && creator && title && title !== creator) summary = `${creator} — ${title}`;
+  if (media.source) summary = `${media.source} · ${summary}`;
+  const withEpisode = label => `${Array.from(label).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}`;
   const activity = {
     activityType: audio || background ? 2 : 3,
     paused: media.state === "paused",
     linkEpisode: media.linkEpisode,
-    title: streamer ? `${media.source} · ${streamer}` : `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}`,
+    title: streamer ? `${media.source} · ${streamer}` : withEpisode(summary),
     detail,
     image: media.artwork ? fitArtwork(media.artwork) : browserArtworkKey(image),
     imageText: playbackRemaining(media)
@@ -252,6 +253,11 @@ export function toActivity(media, image = "", background = false) {
     if (Number.isSafeInteger(start) && start > 0 && Number.isSafeInteger(end)) {
       activity.start = start;
       activity.end = end;
+      if (media.source && title && title !== creator) {
+        const site = creator && creator !== media.source ? `${media.source} · ${creator}` : media.source;
+        activity.discordTitle = Array.from(site).slice(0, 120).join("");
+        activity.discordState = withEpisode(title);
+      }
     }
   }
   return activity;

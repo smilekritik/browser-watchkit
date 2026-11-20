@@ -354,7 +354,8 @@
       || metadata?.title?.trim() || "";
     const caption = description.replace(/\s+#.*$/u, "").trim() || description;
     return {
-      title: [author, caption].filter(Boolean).join(" — ").slice(0, 256) || "Video",
+      title: caption.slice(0, 256) || (author ? "" : "Video"),
+      creator: author.slice(0, 120),
       artwork: tiktokCover(cover?.currentSrc) || tiktokCover(cover?.getAttribute("src")) || tiktokCover(video.poster)
         || (metadata?.artwork ?? []).map(item => tiktokCover(item.src)).find(Boolean) || "",
       clipUrl: id && user ? `https://www.tiktok.com/@${user}/video/${id}` : ""
@@ -413,7 +414,8 @@
     author ||= head?.[1]?.trim() || "";
     caption ||= head?.[2]?.trim() || "";
     return {
-      title: [author, caption].filter(Boolean).join(" — ").slice(0, 256) || "Reel",
+      title: caption.slice(0, 256) || (author ? "" : "Reel"),
+      creator: author.slice(0, 120),
       artwork: instagramCover(video.poster) || (pageMatches ? instagramCover(meta("image")) : ""),
       clipUrl: id ? "https://www.instagram.com/reel/" + id + "/" : ""
     };
@@ -463,7 +465,9 @@
     const media = {
       title: reel?.title ?? title.slice(0, 256),
       source: youtubeMusic ? "YouTube Music" : vkEmbed ? "VK Video" : source,
-      artist: audio && location.protocol !== "file:" ? metadata?.artist?.trim().slice(0, 120) : undefined,
+      artist: (audio || source === "YouTube") && location.protocol !== "file:"
+        ? metadata?.artist?.trim().slice(0, 120) : undefined,
+      creator: reel?.creator,
       audio,
       muted: video.muted || video.volume === 0,
       artwork: reel?.artwork ?? artwork(video, metadata, youtubeMusic ? "YouTube" : source),
@@ -614,7 +618,7 @@
     const media = choice ? snapshot(choice) : null;
     const now = performance.now();
     const interval = media?.state === "playing" ? 5000 : 10000;
-    const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.muted, media.artwork,
+    const signature = media && JSON.stringify([media.source, media.title, media.artist, media.creator, media.audio, media.muted, media.artwork,
       media.duration, media.rate, media.state, media.live, media.season, media.episode, media.clipUrl,
       media.streamer, media.streamUrl]);
     if (force || (media && (seeked || choice.video !== lastReport?.video

@@ -102,6 +102,10 @@ void Discord::set_activity(std::string id, const std::optional<Activity>& value)
     json activity{{"type", value->type}, {"details", clean(value->title)}};
     if (value->start > 0 && value->end > value->start) {
         activity["timestamps"] = {{"start", value->start}, {"end", value->end}};
+        if (!value->discord_title.empty() && !value->discord_state.empty()) {
+            activity["details"] = clean(value->discord_title);
+            activity["state"] = clean(value->discord_state);
+        }
     } else if (!value->detail.empty()) {
         activity["state"] = clean(value->detail);
     }

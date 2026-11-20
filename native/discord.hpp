@@ -17,6 +17,7 @@ struct Activity {
     std::string image_text;
     std::string watch_label;
     bool paused = false;
+    std::string discord_title, discord_state;
 };
 
 class Discord {

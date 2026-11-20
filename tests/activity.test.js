@@ -185,6 +185,7 @@ test("anchors Discord progress at normal speed and falls back to the media clock
     assert.equal(accelerated.detail, `01:47 / 03:06 · Speed ${rate}×`);
     assert.equal(accelerated.start, undefined);
     assert.equal(accelerated.end, undefined);
+    assert.equal(accelerated.discordState, undefined);
   }
   assert.equal(playbackRemaining({ ...media, rate: 1.5 }), "00:53 left");
   assert.equal(toActivity({ ...media, rate: 1.5 }, "watchkit").imageText, "00:53 left");
@@ -192,7 +193,12 @@ test("anchors Discord progress at normal speed and falls back to the media clock
     const stopped = toActivity({ ...media, state });
     assert.equal(stopped.start, undefined);
     assert.equal(stopped.end, undefined);
+    assert.equal(stopped.discordState, undefined);
   }
+  const episode = toActivity({ ...media, source: "YouTube", title: "MobLand S01E04" });
+  assert.equal(episode.discordTitle, "YouTube");
+  assert.equal(episode.discordState, "MobLand · S1 Ep.4");
+  assert.equal(episode.detail, "01:47 / 03:06");
 });
 
 test("ignores stale frames and selects the strongest candidate", () => {

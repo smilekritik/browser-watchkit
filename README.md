@@ -40,7 +40,7 @@ If the card is missing, open Discord's **User Settings → Activity Privacy** an
 
 ### Playback timing
 
-Play a video of known duration at `1×` to see Discord's progress bar in the full profile's **Activity** tab. Discord may omit the bar in its compact voice-channel popup. At another speed, the card shows the video's current position and duration, for example `01:47 / 03:06 · Speed 1.5×`. Seek, pause, or change speed to update the displayed position. Paused media shows a fixed position. Return to `1×` to restore the moving bar.
+Play media of known duration at `1×` to see Discord's progress bar in the full profile's **Activity** tab. The first text line shows the site and the artist or creator when available. The next line shows the track, video, or episode title. Discord may omit the bar in its compact voice-channel popup. At another speed, the card shows the media's current position and duration, for example `01:47 / 03:06 · Speed 1.5×`. Seek, pause, or change speed to update the displayed position. Paused media shows a fixed position. Return to `1×` to restore the moving bar.
 
 Hover over the cover in the Discord profile to see the estimated time left at the current speed. The WatchKit popup shows the same estimate. At `01:47` in a `03:06` video on `1.5×`, both show `00:53 left`. Live playback and media with an unknown duration omit this estimate. When playback pauses, the cover has a small pause badge with a `Paused` tooltip.
 

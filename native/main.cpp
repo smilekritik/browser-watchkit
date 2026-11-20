@@ -139,7 +139,8 @@ int main()
                         std::move(title), string_field(message, "detail"), string_field(message, "image"),
                         string_field(message, "watchUrl"), listening ? 2 : 3,
                         timestamp_field(message, "start"), timestamp_field(message, "end"),
-                        string_field(message, "imageText"), string_field(message, "watchLabel"), paused
+                        string_field(message, "imageText"), string_field(message, "watchLabel"), paused,
+                        string_field(message, "discordTitle"), string_field(message, "discordState")
                     });
                 }
             }
