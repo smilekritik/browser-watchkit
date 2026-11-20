@@ -12,6 +12,7 @@ These adapters handle metadata or links exposed in a particular format. Miruro-s
 
 | Site or player | What WatchKit reads |
 | --- | --- |
+| Twitch and Kick live channels | The channel login comes from the channel URL or supported player embed. The broadcast title comes from the page or player metadata. The Discord button opens the channel. VODs and clips use the regular video layout. |
 | AniLiberty archive (`anilibria.tv`, `anilibria.uno`) | Active PlayerJS playlist entry and an episode link. For external YouTube and RUTUBE players, uses the episode selected in that player's list. |
 | AniLiberty episode pages | Series title and episode number from the episode page title. |
 | YummyAnime with Kodik | Series title, selected episode and poster from the outer page. Prefers an English title when available. |

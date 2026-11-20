@@ -51,13 +51,13 @@ void Discord::disconnect()
     if (event_) ResetEvent(event_);
 }
 
-void Discord::update(std::string id, std::optional<Activity> value, bool paused)
+void Discord::update(std::string id, std::optional<Activity> value)
 {
     activity_id_ = std::move(id);
     activity_ = std::move(value);
     std::optional<PresenceLevel> level;
     if (activity_ && !activity_id_.empty() && event_)
-        level = paused ? PresenceLevel::browser_paused : PresenceLevel::browser_playing;
+        level = activity_->paused ? PresenceLevel::browser_paused : PresenceLevel::browser_playing;
     priority_.set(level);
     sync_priority(true);
 }
@@ -100,12 +100,26 @@ void Discord::set_activity(std::string id, const std::optional<Activity>& value)
         return;
     }
     json activity{{"type", value->type}, {"details", clean(value->title)}};
-    if (!value->detail.empty()) activity["state"] = clean(value->detail);
-    if (!value->image.empty()) activity["assets"] = {{"large_image", value->image}};
-    if (value->watch_url.starts_with("https://") && value->watch_url.size() <= 512) {
-        activity["buttons"] = json::array({{{"label", value->type == 2 ? "Listen too" : "Watch too"}, {"url", value->watch_url}}});
+    if (value->start > 0 && value->end > value->start) {
+        activity["timestamps"] = {{"start", value->start}, {"end", value->end}};
+    } else if (!value->detail.empty()) {
+        activity["state"] = clean(value->detail);
     }
-    if (value->end > 0) activity["timestamps"] = {{"end", value->end}};
+    if (!value->image.empty()) {
+        activity["assets"]["large_image"] = value->image;
+        if (!value->image_text.empty()) activity["assets"]["large_text"] = clean(value->image_text);
+    }
+    if (value->paused) {
+        activity["assets"]["small_image"] = id_ == "1056962833218293800" ? "pauselight"
+            : "https://cdn.discordapp.com/app-assets/1056962833218293800/1056963729805295677.png";
+        activity["assets"]["small_text"] = "Paused";
+    }
+    if (value->watch_url.starts_with("https://") && value->watch_url.size() <= 512) {
+        std::string label = value->type == 2 ? "Listen too" : "Watch too";
+        if (!value->watch_label.empty() && value->watch_label.size() <= 32)
+            label = clean(value->watch_label);
+        activity["buttons"] = json::array({{{"label", label}, {"url", value->watch_url}}});
+    }
     auto payload = activity.dump(-1, ' ', false, json::error_handler_t::replace);
     if (wanted_ == payload && (deadline_ || pipe_ != INVALID_HANDLE_VALUE))
         return;

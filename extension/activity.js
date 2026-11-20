@@ -1,6 +1,6 @@
 export const defaultSettings = {
-  enabled: false,
-  applicationId: "",
+  enabled: true,
+  applicationId: "1056962833218293800",
   blockedHosts: [],
   backgroundPlayback: true,
   shareLink: true,
@@ -149,6 +149,20 @@ function time(value, maximum) {
   return clock;
 }
 
+function playbackDuration(media) {
+  return !media.live && Number.isFinite(media.duration) && media.duration > 0 ? media.duration : 0;
+}
+
+export function playbackRemaining(media) {
+  const duration = playbackDuration(media);
+  if (!duration || !Number.isFinite(media.position) || media.position < 0
+      || !Number.isFinite(media.rate) || media.rate <= 0) return "";
+  const totalAtSpeed = Math.ceil(duration / media.rate);
+  if (!Number.isSafeInteger(totalAtSpeed)) return "";
+  const remaining = Math.ceil(Math.max(0, duration - media.position) / media.rate);
+  return `${time(remaining, totalAtSpeed)} left`;
+}
+
 function fitArtwork(artwork) {
   // Send only public video covers from the supported CDNs to the resizing service.
   const publicCover = /^https:\/\/i\.ytimg\.com\/vi\/[\w-]{11}\/hqdefault\.jpg$/
@@ -176,7 +190,8 @@ export function toActivity(media, image = "", background = false) {
     ? media.title.replace(/[\u0000-\u001f\u007f]/g, " ").trim()
     : "";
   const audio = media.audio === true;
-  const episodic = !audio && media.source !== "TikTok" && media.source !== "Instagram";
+  const streamer = !audio && media.live && /^[a-z\d_-]{1,25}$/i.test(media.streamer ?? "") ? media.streamer : "";
+  const episodic = !audio && !streamer && media.source !== "TikTok" && media.source !== "Instagram";
   const episode = episodic && /^(.*?)[\s._-]*s(\d{1,2})[\s._-]*e(\d{1,3})(?=$|[\s._\[\]()-])(.*)$/i.exec(title);
   const spelledOut = episodic && (
     /^(.*?)\s*(?:[·|–—]|\s-)\s*Season\s+(\d{1,4}),?\s+Episode\s+(\d{1,4})$/i.exec(title)
@@ -208,30 +223,38 @@ export function toActivity(media, image = "", background = false) {
   const artist = audio && typeof media.artist === "string"
     ? media.artist.replace(/[\u0000-\u001f\u007f]/g, " ").trim() : "";
   if (artist && title && title !== artist) title = `${artist} — ${title}`;
-  const rate = `${media.rate.toFixed(2)}×`;
-  const gap = rate.length < "31.25×".length ? " " : "\u2009";
-  let detail = rate;
+  const duration = playbackDuration(media);
+  let detail;
   if (media.live) {
-    detail = `LIVE · ${rate}`;
-  } else if (Number.isFinite(media.duration) && media.duration > 0) {
-    const position = Math.min(media.position, media.duration);
-    const remaining = Math.ceil((media.duration - position) / media.rate);
-    const totalAtSpeed = Math.ceil(media.duration / media.rate);
-    detail = `${time(position, media.duration)} / ${time(media.duration, media.duration)}${gap}·${gap}${rate} · ${time(remaining, totalAtSpeed)} left`;
+    detail = streamer ? title || `Live on ${media.source}` : "LIVE";
+  } else if (duration) {
+    detail = `${time(Math.min(media.position, duration), duration)} / ${time(duration, duration)}`;
   } else {
-    detail = `${time(media.position, 0)}${gap}·${gap}${rate}`;
+    detail = time(media.position, 0);
   }
+  if (media.rate !== 1) detail += ` · Speed ${media.rate}×`;
   if (media.state === "buffering") detail += " · Buffering";
   title ||= audio ? "Audio" : "Video";
   if (media.source) title = `${media.source} · ${title}`;
-  return {
+  const activity = {
     activityType: audio || background ? 2 : 3,
     paused: media.state === "paused",
     linkEpisode: media.linkEpisode,
-    title: `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}${media.state === "paused" ? " · ⏸\ufe0e" : ""}`,
-    detail: detail.replace(/\d/g, digit => String.fromCodePoint(0x1d7f6 + Number(digit))),
-    image: media.artwork ? fitArtwork(media.artwork) : browserArtworkKey(image)
+    title: streamer ? `${media.source} · ${streamer}` : `${Array.from(title).slice(0, 120 - episodeSuffix.length).join("")}${episodeSuffix}`,
+    detail,
+    image: media.artwork ? fitArtwork(media.artwork) : browserArtworkKey(image),
+    imageText: playbackRemaining(media)
   };
+  if (streamer) activity.watchLabel = `Watch ${streamer}`;
+  if (media.state === "playing" && media.rate === 1 && duration >= 1 && media.position < duration) {
+    const start = Math.floor(media.sampledAt / 1000 - media.position);
+    const end = start + Math.round(duration);
+    if (Number.isSafeInteger(start) && start > 0 && Number.isSafeInteger(end)) {
+      activity.start = start;
+      activity.end = end;
+    }
+  }
+  return activity;
 }
 
 export const sampleLifetime = 16_000;

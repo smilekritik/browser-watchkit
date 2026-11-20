@@ -1,10 +1,22 @@
+import { defaultSettings } from "./activity.js";
+
 export const byId = id => document.getElementById(id);
 export const allWeb = ["http://*/*", "https://*/*"];
+export const mediaWeb = [
+  "https://*.youtube.com/*", "https://*.youtube-nocookie.com/*",
+  "https://*.twitch.tv/*", "https://*.kick.com/*"
+];
 
 const ruleStores = {
   permanent: [chrome.storage.local, "blockedHosts"],
   session: [chrome.storage.session, "pausedHosts"]
 };
+
+export async function getSettings() {
+  const stored = await chrome.storage.local.get(defaultSettings);
+  stored.applicationId ||= defaultSettings.applicationId;
+  return stored;
+}
 
 export async function getRules(kind) {
   const [storage, key] = ruleStores[kind];

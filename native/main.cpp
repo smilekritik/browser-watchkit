@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <string_view>
 #include <thread>
 
 #include <fcntl.h>
@@ -34,6 +35,12 @@ std::string string_field(const json& message, const char* key)
 {
     const auto value = message.find(key);
     return value != message.end() && value->is_string() ? value->get<std::string>() : "";
+}
+
+std::int64_t timestamp_field(const json& message, const char* key)
+{
+    const auto value = message.find(key);
+    return value != message.end() && value->is_number_integer() ? value->get<std::int64_t>() : 0;
 }
 
 void import_vlc_settings()
@@ -125,10 +132,15 @@ int main()
                     const auto pause = message.find("paused");
                     const bool paused = pause != message.end() && pause->is_boolean()
                         ? pause->get<bool>() : title.ends_with("\xE2\x8F\xB8\xEF\xB8\x8E");
+                    constexpr std::string_view legacy_pause_suffix = " \xC2\xB7 \xE2\x8F\xB8\xEF\xB8\x8E";
+                    if (paused && !message.contains("imageText") && title.ends_with(legacy_pause_suffix))
+                        title.resize(title.size() - legacy_pause_suffix.size());
                     discord.update(std::move(id), addon::Activity{
                         std::move(title), string_field(message, "detail"), string_field(message, "image"),
-                        string_field(message, "watchUrl"), listening ? 2 : 3
-                    }, paused);
+                        string_field(message, "watchUrl"), listening ? 2 : 3,
+                        timestamp_field(message, "start"), timestamp_field(message, "end"),
+                        string_field(message, "imageText"), string_field(message, "watchLabel"), paused
+                    });
                 }
             }
         }

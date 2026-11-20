@@ -8,25 +8,11 @@
 [![Chrome](https://img.shields.io/badge/Chrome-119%2B-4285F4)](#install)
 [![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-2EA043)](LICENSE)
 
-[Download for Windows](https://github.com/smilekritik/browser-watchkit/releases/latest) · [Install](#install) · [Discord setup](#get-a-discord-application-id) · [Use WatchKit](#use-watchkit) · [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
+[Download for Windows](https://github.com/smilekritik/browser-watchkit/releases/latest) · [Install](#install) · [Discord setup](#connect-discord-in-chrome) · [Use WatchKit](#use-watchkit) · [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
 
 </div>
 
-WatchKit follows playback in Chrome, including music or video with sound in background tabs. The Discord card shows the site, title, artwork when available, playback speed, and time left. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
-
-## WatchKit for Chrome and VLC
-
-Use the same Discord application in both editions. Enter the same **Application ID** in Chrome and VLC to publish playback under one name on your Discord profile. You only need to create the application once. [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
-
-With Chrome 1.5.1 and VLC 1.1.3 or later, playing media in VLC takes priority over Chrome. Playing browser media takes over when VLC pauses or stops, including playback from an allowed background tab. If both have paused media, VLC keeps the card. Update the Windows bridge as well as the extension when upgrading to 1.5.1.
-
-## Screenshots
-
-| Video | Live stream |
-| --- | --- |
-| ![Discord activity with a video, thumbnail and time remaining](docs/screenshots/discord-bilibili.png) | ![Discord activity with a live stream and channel artwork](docs/screenshots/discord-twitch.png) |
-
-![WatchKit settings with Discord setup, website access, exclusions and keyboard shortcut](docs/screenshots/chrome-settings.png)
+WatchKit follows playback in Chrome, including music or video with sound in background tabs. The Discord card shows the site, title, artwork when available, playback position, and playback speed when it differs from 1×. The WatchKit popup shows how much time is left at the current speed. A configurable keyboard shortcut pauses and resumes tracking across Chrome.
 
 ## Install
 
@@ -40,26 +26,39 @@ You need Windows 10 or 11 x64, Chrome 119 or later, and the [Discord desktop app
 
 The bridge runs when Chrome needs it. If you prefer PowerShell, run `Unblock-File -LiteralPath .\scripts\install.ps1` from the extracted folder, then run `.\scripts\install.ps1`. You can also right-click the unblocked script and choose **Run with PowerShell**. The batch file keeps the setup result visible.
 
-## Get a Discord Application ID
-
-Use the same Application ID for WatchKit in Chrome and VLC. If you already have a Discord application for WatchKit, open it and skip to step 3.
-
-1. Sign in to the [Discord Developer Portal](https://discord.com/developers/applications) and choose **New Application**.
-2. Enter `WatchKit` as the name and click **Create**. Discord uses that name in the activity heading.
-3. In your application's sidebar, open **General Information**. Find **Application ID** and click **Copy**.
-
-![Where to create an application and where to copy its ID in the Discord Developer Portal](docs/screenshots/discord-application-id.svg)
-
-The Application ID is public. You can set up Rich Presence with the ID alone, without creating a bot or copying a token. For optional fallback artwork, upload an image under **Rich Presence → Art Assets** in that application and copy its asset key.
-
 ## Connect Discord in Chrome
 
-1. Open the Discord desktop app and sign in.
-2. Open the WatchKit popup and click **Set up Discord** or the **Settings** icon. In the settings tab, paste your **Application ID** and click **Save settings**. The field masks the ID. Click **Show** if you want to check it. If WatchKit for VLC already has an ID saved under the same Windows account, click **Import ID from WatchKit for VLC**. [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit)
-3. Open a video tab. In the popup, choose **Allow this site** for a video served by the current site. When the site embeds a player on another domain, open **Settings → Website access → Allow all websites** to give WatchKit access to both the page and the player. Return to the video tab.
-4. Turn on **Share on Discord**, play the video, and keep its tab selected. Look for **Sharing on Discord** in the popup and check the card on your Discord profile.
+WatchKit uses the shared Discord Application ID `1056962833218293800` and turns on **Share on Discord** on a fresh install. Discord desktop publishes the activity to the account you're signed in to. No bot invite or token is required.
 
-If the card is missing, open Discord's **User Settings → Activity Privacy** and enable activity sharing. Check that WatchKit has the Application ID from **General Information**.
+1. Open the Discord desktop app and sign in.
+2. Open a video tab, choose **Allow this site** in the WatchKit popup, and confirm the Chrome prompt. To allow YouTube, YouTube Music, Twitch, and Kick together, use **Settings → Website access → Allow media sites**.
+3. Play the video and keep its tab selected. Look for **Sharing on Discord** in the popup, then open your full Discord profile and select **Activity**. Use **Share on Discord** in the popup whenever you want to stop or resume sharing.
+
+For an embedded player on another domain, allow both the page and player domains, or use **Settings → Website access → Allow all websites**.
+
+If the card is missing, open Discord's **User Settings → Activity Privacy** and enable activity sharing. Use **Show** in WatchKit settings to verify the saved ID.
+
+### Playback timing
+
+Play a video of known duration at `1×` to see Discord's progress bar in the full profile's **Activity** tab. Discord may omit the bar in its compact voice-channel popup. At another speed, the card shows the video's current position and duration, for example `01:47 / 03:06 · Speed 1.5×`. Seek, pause, or change speed to update the displayed position. Paused media shows a fixed position. Return to `1×` to restore the moving bar.
+
+Hover over the cover in the Discord profile to see the estimated time left at the current speed. The WatchKit popup shows the same estimate. At `01:47` in a `03:06` video on `1.5×`, both show `00:53 left`. Live playback and media with an unknown duration omit this estimate. When playback pauses, the cover has a small pause badge with a `Paused` tooltip.
+
+## WatchKit for Chrome and VLC
+
+Enter the shared WatchKit ID above in **View → WatchKit Settings** in VLC. If VLC already uses a custom ID and runs under the same Windows account, open Chrome WatchKit's **Settings → Discord** and choose **Import ID from WatchKit for VLC**. If Chrome is already set up with a custom ID, you can also paste it into VLC. [VLC Discord setup](https://github.com/smilekritik/vlc-watchkit/blob/main/docs/DISCORD.md)
+
+With Chrome 1.5.1 and VLC 1.1.3 or later, playing media in VLC takes priority over Chrome. Playing browser media takes over when VLC pauses or stops, including playback from an allowed background tab. If both have paused media, VLC keeps the card.
+
+## Screenshots
+
+| Video | Live stream |
+| --- | --- |
+| ![Discord activity with a video and thumbnail](docs/screenshots/discord-bilibili.png) | ![Discord activity with a live stream and channel artwork](docs/screenshots/discord-twitch.png) |
+
+The Discord screenshots are from an earlier release. See [Playback timing](#playback-timing) and [Live streams](#live-streams) for the current layout.
+
+![WatchKit settings with Discord setup, website access, exclusions and keyboard shortcut](docs/screenshots/chrome-settings.png)
 
 ## Use WatchKit
 
@@ -82,6 +81,10 @@ After updating WatchKit, open its settings and click **Reload extension**, then 
 
 WatchKit uses **Listening** for audio playback. Artist and artwork depend on the information exposed by the player. See [player detection](docs/PLAYER-DETECTION.md) for services with built-in Discord integrations or custom metadata handling.
 
+### Live streams
+
+On a live Twitch or Kick channel, the first line of the Discord card shows the platform and the streamer's login. The second line shows the broadcast title when the player makes it available. For example, the first line can be `Twitch · koma` and the button `Watch koma`. The button opens the channel. Recordings and clips use the regular video layout.
+
 ### Series and embedded players
 
 WatchKit recognizes explicit episode labels in titles, selected episode controls, and playback URLs such as `/watch/<id>/<title>?ep=7`. On these playback URLs, it combines the episode from the page with the timing from the active player, including an accessible embedded player. See the [detection rules and player adapters](docs/PLAYER-DETECTION.md).
@@ -96,9 +99,9 @@ WatchKit looks for public HTTPS artwork in the player's media metadata, the vide
 
 ## Update or remove
 
-To update, turn sharing off and close Chrome. Extract the new release and copy its files into the original folder, replacing the older files. Double-click **Install WatchKit.bat**, then open Chrome and click **Reload** on the WatchKit card at `chrome://extensions`. Refresh any video tab you had open. Keeping the original extension folder preserves its settings.
-
-You can also use **Reload extension** in WatchKit settings after replacing the extension files. Save pending settings first, then refresh the playback tab after WatchKit reloads.
+1. Close Chrome and download the latest Windows x64 ZIP. Extract it and copy its contents into the original WatchKit folder, replacing older files. Keeping the original extension folder preserves its settings.
+2. Double-click **Install WatchKit.bat** in that folder to update the Windows bridge. Use the bridge and the extension from the same release.
+3. Open Chrome and click **Reload** on the WatchKit card at `chrome://extensions`. You can also click **Reload extension** in WatchKit settings. Refresh any playback tabs you had open.
 
 To remove it, close Chrome, unblock and run `./scripts/uninstall.ps1` from the release folder, then remove WatchKit in `chrome://extensions`.
 
@@ -111,7 +114,7 @@ To remove it, close Chrome, unblock and run `./scripts/uninstall.ps1` from the r
 | **WatchKit bridge could not start** | Rerun **Install WatchKit.bat** using the same Windows account as Chrome, then reload WatchKit in `chrome://extensions`. For a custom build with a different extension ID, run `.\scripts\install.ps1 -ExtensionId YOUR_EXTENSION_ID`. |
 | **Waiting for playback** | Play the media in the selected Chrome tab and check its site permissions and exclusions. For a player embedded from another domain, grant access to that domain, then refresh the tab. |
 | **Waiting for the Discord desktop app** | Open Discord desktop and sign in. If Discord is already open, check the **Application ID** in WatchKit settings. |
-| **Discord rejected the activity** or no Discord card | Copy the **Application ID** from **General Information** in the Discord Developer Portal, save it in WatchKit, and check Discord's activity privacy settings. |
+| **Discord rejected the activity** or no Discord card | Compare the saved ID with the one in [Connect Discord in Chrome](#connect-discord-in-chrome) or your own application's **General Information**. Check Discord's activity privacy settings. |
 | The card shows only a player name or misses the episode | Record the page URL and the selected player's name. A site can offer multiple players and each can expose title, season, and episode data differently. |
 | The card shows a question mark or the wrong artwork | Under **Settings → Discord**, clear the fallback artwork field or enter an asset key that exists in the same Discord application, then save. A site can provide a preview URL that Discord cannot load, for example when it requires a signed-in browser. |
 
@@ -122,3 +125,9 @@ Clone this repository or extract the source ZIP. In PowerShell 7, use `Get-Child
 The native Discord transport is shared with [WatchKit for VLC](https://github.com/smilekritik/vlc-watchkit). See [LICENSE](LICENSE).
 
 To package a release, build the bridge from the tagged revision, then run `./scripts/package-release.ps1 -Tag vX.Y.Z`. Upload the ZIP and `SHA256SUMS.txt` from `build/release/vX.Y.Z` to GitHub Releases. The script checks that the installer is at the archive root and that the Chrome manifest matches the tag.
+
+For a store release, follow the [Chrome Web Store release guide](docs/CHROME-WEB-STORE.md). The [privacy policy](docs/PRIVACY.md) describes data used by the extension and its bridge.
+
+## Get a Discord Application ID
+
+To choose your own activity name or upload your own artwork, [set up your own Discord application](docs/DISCORD.md).

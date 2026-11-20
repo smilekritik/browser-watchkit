@@ -13,7 +13,10 @@ struct Activity {
     std::string title, detail, image;
     std::string watch_url;
     int type = 3;
-    std::int64_t end = 0;
+    std::int64_t start = 0, end = 0;
+    std::string image_text;
+    std::string watch_label;
+    bool paused = false;
 };
 
 class Discord {
@@ -21,7 +24,7 @@ public:
     using Clock = std::chrono::steady_clock;
     Discord() = default;
     ~Discord();
-    void update(std::string id, std::optional<Activity> activity, bool paused = false);
+    void update(std::string id, std::optional<Activity> activity);
     bool yielding() const { return yielding_; }
     void pump();
     bool take_acknowledgement();

@@ -1,5 +1,5 @@
 import { bridgeAdvice, browserArtworkKey, defaultSettings, siteRule, validId } from "./activity.js";
-import { allWeb, byId, getRules, setRule } from "./preferences.js";
+import { allWeb, byId, getRules, getSettings, mediaWeb, setRule } from "./preferences.js";
 
 const application = byId("application");
 const image = byId("image");
@@ -7,8 +7,9 @@ const backgroundPlayback = byId("background-playback");
 const shareLink = byId("share-link");
 const discordNotice = byId("discord-notice");
 const rulesNotice = byId("rules-notice");
+const allowMedia = byId("allow-media");
 const allowAll = byId("allow-all");
-const saved = await chrome.storage.local.get(defaultSettings);
+const saved = await getSettings();
 application.value = saved.applicationId;
 image.value = browserArtworkKey(saved.image);
 backgroundPlayback.checked = saved.backgroundPlayback;
@@ -23,9 +24,9 @@ byId("show-id").onclick = event => {
 
 byId("config").onsubmit = async event => {
   event.preventDefault();
-  const applicationId = application.value.trim();
-  if (applicationId && !validId(applicationId)) {
-    discordNotice.textContent = "Copy the 16–20 digit Application ID from General Information in the Discord Developer Portal.";
+  const applicationId = application.value.trim() || defaultSettings.applicationId;
+  if (!validId(applicationId)) {
+    discordNotice.textContent = "Enter the 16–20 digit Application ID from the WatchKit setup guide or Discord Developer Portal.";
     application.focus();
     return;
   }
@@ -33,6 +34,7 @@ byId("config").onsubmit = async event => {
     image.value = browserArtworkKey(image.value);
     await chrome.storage.local.set({ applicationId, image: image.value,
       backgroundPlayback: backgroundPlayback.checked, shareLink: shareLink.checked });
+    application.value = applicationId;
     discordNotice.textContent = "Settings saved.";
   } catch {
     discordNotice.textContent = "Could not save Discord settings.";
@@ -55,10 +57,26 @@ byId("import-vlc").onclick = async () => {
 };
 
 async function updateAccess() {
-  const granted = await chrome.permissions.contains({ origins: allWeb });
+  const [granted, mediaGranted] = await Promise.all([
+    chrome.permissions.contains({ origins: allWeb }),
+    chrome.permissions.contains({ origins: mediaWeb })
+  ]);
   allowAll.textContent = granted ? "Remove all-sites access" : "Allow all websites";
   allowAll.dataset.granted = String(granted);
+  allowMedia.disabled = mediaGranted;
+  allowMedia.textContent = mediaGranted ? "Media sites allowed" : "Allow media sites";
 }
+
+allowMedia.onclick = async () => {
+  const notice = byId("access-notice");
+  try {
+    const granted = await chrome.permissions.request({ origins: mediaWeb });
+    notice.textContent = granted ? "" : "Site access was declined.";
+    await updateAccess();
+  } catch {
+    notice.textContent = "Could not grant access to the media sites.";
+  }
+};
 
 allowAll.onclick = async () => {
   const notice = byId("access-notice");
@@ -132,7 +150,21 @@ const shortcut = commands.find(command => command.name === "toggle-sharing")?.sh
 byId("shortcut-key").textContent = shortcut ?? "";
 byId("shortcut-key").hidden = !shortcut;
 byId("shortcut-settings").onclick = () => chrome.tabs.create({ url: "chrome://extensions/shortcuts" });
-byId("reload-extension").onclick = () => chrome.runtime.reload();
+const reloadButton = byId("reload-extension");
+reloadButton.onclick = async () => {
+  reloadButton.disabled = true;
+  try {
+    const reply = await chrome.runtime.sendMessage({ type: "prepare-reload" });
+    if (reply?.ready) {
+      chrome.runtime.reload();
+      return;
+    }
+  } catch {
+    if (!globalThis.chrome?.runtime?.id) return;
+  }
+  reloadButton.disabled = false;
+  discordNotice.textContent = "Could not reload WatchKit. Try again.";
+};
 chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "local" && changes.blockedHosts) || (area === "session" && changes.pausedHosts)) void updateRules();
 });

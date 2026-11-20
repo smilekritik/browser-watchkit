@@ -198,6 +198,61 @@
     return siteName(knownSites) || host.slice(0, 48) || "Chrome";
   }
 
+  function streamChannel(page) {
+    const host = page.hostname.replace(/^(?:www\.|m\.)/, "");
+    const twitch = host === "twitch.tv" || host === "player.twitch.tv";
+    const kick = host === "kick.com" || host === "player.kick.com";
+    if (page.protocol !== "https:" || page.username || page.password || page.port || (!twitch && !kick)) return null;
+    const candidate = host === "player.twitch.tv"
+      ? (page.pathname === "/" ? page.searchParams.get("channel") : null)
+      : /^\/([^/]+)\/?$/.exec(page.pathname)?.[1];
+    const pattern = twitch ? /^[a-z\d_]{1,25}$/i : /^[a-z\d_-]{1,25}$/i;
+    if (!pattern.test(candidate ?? "")) return null;
+    const login = candidate.toLowerCase();
+    if (["browse", "categories", "clips", "directory", "downloads", "following", "search", "settings", "videos"].includes(login))
+      return null;
+    return { login, url: twitch ? `https://www.twitch.tv/${login}` : `https://kick.com/${login}` };
+  }
+
+  function liveStreamMetadata(channel) {
+    for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+      const text = script.textContent;
+      if (!text?.includes('"isLiveBroadcast"')) continue;
+      try {
+        const data = JSON.parse(text);
+        const entries = data?.["@graph"] ?? (Array.isArray(data) ? data : [data]);
+        const stream = entries.find(entry => entry?.["@type"] === "VideoObject"
+          && [].concat(entry.publication).some(event => event?.isLiveBroadcast === true)
+          && [entry.url, entry.embedUrl].some(url => typeof url === "string"
+            && streamChannel(new URL(url, location.href))?.url === channel.url));
+        if (stream) return stream;
+      } catch {
+        // Other page metadata may be malformed or refer to a different channel.
+      }
+    }
+    return null;
+  }
+
+  function liveStream(video, source, metadata) {
+    if (source !== "Twitch" && source !== "Kick") return null;
+    const channel = streamChannel(new URL(location.href));
+    if (!channel) return null;
+    const structured = liveStreamMetadata(channel);
+    const twitch = source === "Twitch";
+    const titleSelector = twitch ? '[data-a-target="stream-title"]' : '[data-testid="livestream-title"]';
+    const heading = document.querySelector(titleSelector)?.textContent.trim();
+    if (!structured && video.duration !== Infinity) return null;
+    const ogUrl = document.querySelector('meta[property="og:url"]')?.content;
+    const description = twitch && ogUrl?.replace(/\/$/, "").toLowerCase() === channel.url
+      ? document.querySelector('meta[property="og:description"]')?.content : "";
+    const twitchTitle = /^(.+?)\s+\|\s+Streaming\b.+$/is.exec(description ?? "")?.[1];
+    const sessionTitle = metadata?.title?.trim().replace(/\s+-\s+(?:Live on )?Twitch$/i, "");
+    const namedSession = sessionTitle && ![channel.login, source.toLowerCase()].includes(sessionTitle.toLowerCase());
+    const kickTitle = !twitch && typeof structured?.name === "string" ? structured.name : "";
+    const title = heading || twitchTitle || kickTitle || (namedSession ? sessionTitle : "");
+    return { streamer: channel.login, streamUrl: channel.url, live: true, title: title.slice(0, 256) };
+  }
+
   function artwork(video, metadata, source) {
     if (location.protocol === "file:") return "";
     let youtubeThumbnail;
@@ -421,6 +476,8 @@
       clipUrl: reel?.clipUrl
     };
     if (tiktok && !audio) Object.assign(media, tiktokDetails(video, metadata));
+    const stream = !audio && liveStream(video, source, metadata);
+    if (stream) return { ...media, ...stream };
     if (localPlayer) {
       const panel = document.getElementById("anilibriaPlayer_playlist");
       observeEpisodePanel(panel);
@@ -529,7 +586,20 @@
     const signature = JSON.stringify(page);
     if (signature === lastPage) return;
     lastPage = signature;
-    chrome.runtime.sendMessage({ type: "page-metadata", token: watching, page }).catch(() => {});
+    void sendReport({ type: "page-metadata", token: watching, page });
+  }
+
+  async function sendReport(message) {
+    try {
+      const runtime = chrome.runtime;
+      if (runtime?.id) {
+        const reply = await runtime.sendMessage(message);
+        if (message.type !== "media" || reply?.watching) return;
+      }
+    } catch {
+      // After an extension reload, sending from an old page can throw synchronously.
+    }
+    if (message.token === token) stop();
   }
 
   function report(force = false) {
@@ -539,23 +609,23 @@
     const watching = token;
     if (!watching) return;
     if (yummyAnime || habster || legacyLibria || episodePage) reportPage(watching);
+    if (watching !== token) return;
     const choice = selected();
     const media = choice ? snapshot(choice) : null;
     const now = performance.now();
     const interval = media?.state === "playing" ? 5000 : 10000;
     const signature = media && JSON.stringify([media.source, media.title, media.artist, media.audio, media.muted, media.artwork,
-      media.duration, media.rate, media.state, media.live, media.season, media.episode, media.clipUrl]);
+      media.duration, media.rate, media.state, media.live, media.season, media.episode, media.clipUrl,
+      media.streamer, media.streamUrl]);
     if (force || (media && (seeked || choice.video !== lastReport?.video
         || signature !== lastReport?.signature || now - sentAt >= interval))
         || (!media && lastReport)) {
       lastReport = media ? { video: choice.video, signature } : undefined;
       sentAt = now;
-      chrome.runtime.sendMessage({ type: "media", token: watching, media }).then(reply => {
-        if (watching === token && !reply?.watching) stop();
-      }).catch(() => { if (watching === token) stop(); });
+      void sendReport({ type: "media", token: watching, media });
     }
     seeked = false;
-    if (media) heartbeat = setTimeout(report, Math.max(0, sentAt + interval - now));
+    if (media && watching === token) heartbeat = setTimeout(report, Math.max(0, sentAt + interval - now));
 
     if ([...roots].some(root => !root.isConnected)) {
       observer.disconnect();
@@ -599,8 +669,12 @@
     removeEventListener("pagehide", stop);
   }
 
-  chrome.runtime.onMessage.addListener(message => {
-    if (message?.type === "stop" && message.token === token) stop();
+  chrome.runtime.onMessage.addListener((message, _sender, reply) => {
+    if (message?.type === "stop" && message.token === token) {
+      stop();
+      reply({ watching: false });
+      return;
+    }
     if (message?.type !== "watch" || message.token === token) return;
     stop();
     token = message.token;

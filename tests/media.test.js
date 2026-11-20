@@ -2,12 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { toActivity } from "../extension/activity.js";
+import { toActivity, watchLink } from "../extension/activity.js";
 
 const mediaScript = readFileSync(new URL("../extension/media.js", import.meta.url), "utf8");
 
 function track(url, { title = "", selectors = {}, images = [], top = false, media = {}, metadata,
-  audio = false, player = null, episodePage = false, covers = [], pageMetadata = false } = {}) {
+  audio = false, player = null, episodePage = false, covers = [], pageMetadata = false,
+  structuredData = [], failSend, detached = false } = {}) {
   const watchWindow = {};
   watchWindow.top = top ? watchWindow : {};
   const sent = [];
@@ -38,7 +39,10 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
     },
     querySelector: selector => selectors[selector],
     getElementById: id => selectors[`#${id}`],
-    querySelectorAll: selector => selector === "img[data-cover-target], a[href] img" ? covers : images,
+    querySelectorAll: selector => {
+      if (selector === 'script[type="application/ld+json"]') return structuredData;
+      return selector === "img[data-cover-target], a[href] img" ? covers : images;
+    },
     addEventListener() {},
     removeEventListener() {}
   };
@@ -51,14 +55,89 @@ function track(url, { title = "", selectors = {}, images = [], top = false, medi
     getComputedStyle: () => ({ visibility: "visible" }),
     addEventListener() {}, removeEventListener() {}, setTimeout() {}, clearTimeout() {},
     chrome: { runtime: {
+      id: detached ? undefined : "watchkit-test",
       onMessage: { addListener: listener => { onMessage = listener; } },
-      sendMessage: async message => { sent.push(message); return { watching: true }; }
+      sendMessage: message => {
+        sent.push(message);
+        if (failSend) failSend(message);
+        return Promise.resolve({ watching: true });
+      }
     } }
   });
   onMessage({ type: "watch", token: "test", episodePage });
+  if (detached) return sent;
   if (pageMetadata) return sent.find(message => message.type === "page-metadata")?.page.episodePage;
   return sent.find(message => message.type === "media").media;
 }
+
+test("uses the Twitch login and stream title as separate lines and links to the live channel", () => {
+  const channel = "https://www.twitch.tv/koma";
+  const title = "NEW PATCH & 9K CARRY & LETS GO !tg !vtb";
+  const metadata = { "@type": "VideoObject", name: "Koma - Twitch",
+    embedUrl: "https://player.twitch.tv/?channel=koma&parent=meta.tag",
+    publication: { isLiveBroadcast: true } };
+  const opts = {
+    top: true, title: "Koma - Live on Twitch",
+    selectors: {
+      'meta[property="og:url"]': { content: channel },
+      'meta[property="og:description"]': { content: title + " | Streaming dota 2." }
+    },
+    structuredData: [{ textContent: JSON.stringify({ "@graph": [metadata] }) }]
+  };
+  const media = track(channel + "?referrer=ignored", opts);
+  const activity = toActivity(media);
+  assert.equal(media.live, true);
+  assert.equal(media.streamer, "koma");
+  assert.equal(activity.title, "Twitch · koma");
+  assert.equal(activity.detail, title);
+  assert.equal(activity.watchLabel, "Watch koma");
+  assert.equal(activity.activityType, 3);
+  assert.equal(watchLink(media.streamUrl), channel);
+  assert.equal(activity.end, undefined);
+
+  const changedTitle = track(channel, { ...opts, selectors: {
+    ...opts.selectors, '[data-a-target="stream-title"]': { textContent: "New stream title — Episode 4" }
+  } });
+  assert.equal(toActivity(changedTitle).detail, "New stream title — Episode 4");
+  assert.equal(track("https://www.twitch.tv/videos/1234", opts).streamer, undefined);
+  assert.equal(track("https://www.twitch.tv/someone_else", opts).streamer, undefined);
+  const embed = track("https://player.twitch.tv/?channel=koma&parent=example.com", {
+    media: { duration: Infinity }, metadata: { title }
+  });
+  assert.equal(embed.streamUrl, channel);
+  assert.equal(toActivity(embed).title, "Twitch · koma");
+  assert.equal(toActivity(embed).detail, title);
+});
+
+test("labels Kick live channels while retaining ordinary playback for recordings", () => {
+  const channel = "https://kick.com/example-streamer";
+  const title = "Live from the studio";
+  const opts = { structuredData: [{ textContent: JSON.stringify({ "@graph": [{
+    "@type": "VideoObject", name: title, url: channel, publication: [{ isLiveBroadcast: true }]
+  }] }) }] };
+  const sample = track(channel, opts);
+  assert.equal(toActivity(sample).title, "Kick · example-streamer");
+  assert.equal(toActivity(sample).detail, title);
+  assert.equal(toActivity(sample).watchLabel, "Watch example-streamer");
+  assert.equal(sample.streamUrl, channel);
+  const recording = track(channel + "/videos/1234", opts);
+  assert.equal(recording.live, false);
+  assert.equal(toActivity(recording).watchLabel, undefined);
+});
+
+test("stops tracking when Chrome invalidates the extension context during a send", () => {
+  const invalidated = () => { throw new Error("Extension context invalidated."); };
+  assert.doesNotThrow(() => track("https://music.youtube.com/watch?v=J63aZNuoRek", {
+    top: true, failSend: invalidated
+  }));
+  assert.doesNotThrow(() => track("https://example.com/watch/1234/example?ep=1", {
+    top: true, episodePage: true, pageMetadata: true, failSend: invalidated
+  }));
+});
+
+test("does not send updates from a content script detached by an extension reload", () => {
+  assert.deepEqual(track("https://music.youtube.com/watch?v=J63aZNuoRek", { top: true, detached: true }), []);
+});
 
 test("prefers the current show's cover over generic metadata and other titles", () => {
   const url = "https://example.com/watch/current-id/aoashi-season-2?ep=7";
@@ -184,7 +263,7 @@ test("uses the YouTube Music player clock for position, duration and time left",
   assert.equal(toActivity(sample).activityType, 2);
   assert.equal(sample.position, 37);
   assert.equal(sample.duration, 210);
-  assert.equal(toActivity(sample).detail.normalize("NFKC"), "00:37 / 03:30 · 1.00× · 02:53 left");
+  assert.equal(toActivity(sample).detail, "00:37 / 03:30");
   assert.equal(track(url, { top: true, media }).duration, 302);
 });
 

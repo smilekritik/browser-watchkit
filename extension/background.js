@@ -1,5 +1,6 @@
 import { allowedPage, bridgeAdvice, choosePlayback, defaultSettings, episodeFromUrl, sampleLifetime,
   toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "./activity.js";
+import { getSettings } from "./preferences.js";
 
 const hostName = "com.smilekritik.browser_watchkit";
 const windowTypes = ["normal", "app", "popup"];
@@ -17,6 +18,7 @@ let retryAt = 0;
 let lastPacket = "";
 let expiry;
 let badgeEnabled;
+let reloading = false;
 let toggleSharing = Promise.resolve();
 const previousWatches = chrome.storage.session.get(["watch", "watches"]).then(async ({ watch, watches }) => {
   await Promise.all((watches ?? (watch ? [watch] : [])).map(({ id, token }) =>
@@ -46,9 +48,23 @@ async function attach(tab, frame) {
 
 function stopTracking(tab) {
   watches.delete(tab.id);
-  for (const documentId of tab.documents.values()) {
-    chrome.tabs.sendMessage(tab.id, { type: "stop", token: tab.token }, { documentId }).catch(() => {});
-  }
+  return Promise.all([...tab.documents.values()].map(documentId =>
+    chrome.tabs.sendMessage(tab.id, { type: "stop", token: tab.token }, { documentId }).catch(() => {})));
+}
+
+async function prepareReload() {
+  if (reloading) return;
+  reloading = true;
+  ++revision;
+  clearTimeout(expiry);
+  const stopped = [...watches.values()].map(stopTracking);
+  clearPresence();
+  await Promise.all([previousWatches, ...stopped]);
+  // Resume tracking if the settings page closes before it can request a reload.
+  setTimeout(() => {
+    reloading = false;
+    scheduleRefresh(false);
+  }, 3000);
 }
 
 function clearPresence() {
@@ -126,7 +142,7 @@ function preview() {
   const custom = withPageMetadata(media, tab.pageMetadata);
   const video = custom !== media ? custom : withEpisodePage(media, tab.episode, tab.pageMetadata?.episodePage);
   const activity = toActivity(video, settings.image, background);
-  return { activity, background, url: video.clipUrl ?? tab.url, tabId: tab.id };
+  return { activity, background, url: video.streamUrl ?? video.clipUrl ?? tab.url, tabId: tab.id };
 }
 
 function updatePresence() {
@@ -151,7 +167,7 @@ async function refresh(force = false) {
   await previousWatches;
   const [focused, stored, session] = await Promise.all([
     chrome.windows.getLastFocused({ populate: true, windowTypes }).catch(() => null),
-    chrome.storage.local.get(defaultSettings),
+    getSettings(),
     chrome.storage.session.get({ pausedHosts: [] })
   ]);
   const enabled = stored.enabled && validId(stored.applicationId);
@@ -219,9 +235,10 @@ function watchFrame(tab, frame) {
 }
 
 function scheduleRefresh(force) {
-  void refresh(force).catch(console.error);
+  if (!reloading) void refresh(force).catch(console.error);
 }
 
+chrome.runtime.onInstalled.addListener(() => scheduleRefresh(false));
 chrome.commands.onCommand.addListener(command => {
   if (command !== "toggle-sharing") return;
   toggleSharing = toggleSharing.then(async () => {
@@ -277,6 +294,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.permissions.onAdded.addListener(() => scheduleRefresh(true));
 chrome.permissions.onRemoved.addListener(() => scheduleRefresh(true));
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  if (message?.type === "prepare-reload" && sender.url === chrome.runtime.getURL("options.html")) {
+    prepareReload().then(() => reply({ ready: true }), () => {
+      reloading = false;
+      scheduleRefresh(false);
+      reply({ ready: false });
+    });
+    return true;
+  }
   if (message?.type === "status" && sender.url === chrome.runtime.getURL("popup.html")) {
     const waiting = connection === "connecting" && Date.now() - connectingSince >= 5000;
     const view = preview();
@@ -297,8 +322,12 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     updatePresence();
     return;
   }
-  if (message.media) tab.samples.set(sender.frameId, { media: message.media, seenAt: Date.now() });
-  else tab.samples.delete(sender.frameId);
+  if (message.media) {
+    const seenAt = Date.now();
+    tab.samples.set(sender.frameId, { media: { ...message.media, sampledAt: seenAt }, seenAt });
+  } else {
+    tab.samples.delete(sender.frameId);
+  }
   updatePresence();
   reply({ watching: true });
 });

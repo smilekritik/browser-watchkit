@@ -1,5 +1,5 @@
-import { defaultSettings, isSpotify, matchingHost, siteRule, validId } from "./activity.js";
-import { byId, getRules, setRule } from "./preferences.js";
+import { isSpotify, matchingHost, siteRule, validId } from "./activity.js";
+import { byId, getRules, getSettings, setRule } from "./preferences.js";
 
 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 const url = tab?.url ? new URL(tab.url) : null;
@@ -29,7 +29,7 @@ const stateText = {
 async function refresh() {
   const [reply, config, paused] = await Promise.all([
     chrome.runtime.sendMessage({ type: "status" }),
-    chrome.storage.local.get(defaultSettings),
+    getSettings(),
     getRules("session")
   ]);
   const excludedBy = matchingHost(host, config.blockedHosts);
@@ -54,7 +54,7 @@ async function refresh() {
   const help = byId("connection-help");
   help.textContent = canTrack ? ({
     waiting: "Open Discord desktop and sign in. If it is already open, check the Application ID in WatchKit settings.",
-    rejected: "Copy the Application ID from General Information in the Discord Developer Portal, then save it in WatchKit settings.",
+    rejected: "Check the Application ID in WatchKit settings. Clear it and save to use the shared WatchKit application.",
     unavailable: reply?.connectionHint,
     vlc: "Playing browser media can take over when VLC pauses or stops.",
     idle: "Start playback in this tab. If the player is embedded from another site, allow its domain in Chrome."
@@ -62,7 +62,7 @@ async function refresh() {
   help.hidden = !help.textContent;
   byId("playback-origin").hidden = !background || vlc;
   byId("video").textContent = vlc ? "" : reply?.activity?.title ?? "";
-  byId("timing").textContent = vlc ? "" : reply?.activity?.detail ?? "";
+  byId("timing").textContent = vlc ? "" : [reply?.activity?.detail, reply?.activity?.imageText].filter(Boolean).join(" · ");
   if (!currentRule) return;
   if (spotify) {
     byId("site-state").textContent = "Spotify is handled by Discord";

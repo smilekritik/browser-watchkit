@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "WatchKit",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoEhlanRcq3pW1kDNdAGWfWAoth1XrCn8pKc4AVGbVSyxzUQla53TaSb4kVJEUmivUF953W+5wbOBU8hvmsu4/8WeBp9meKsOoZOE0E6O9yhXzs04Zx8Udd4cmyu5k0magAvX45gKWbhOi7/6ehbtA8sl/9eotC4Z7eK+etHd34gelLABfpKghYiqFAcFPfB4Z4Ku2wkLgMK9mDxIh+9ud+9xvTVbmptiF0dAa6sR5N3GHgrKq66jiauwyakv4hovlqxPP9z9vG6exyfHTPNgy42GZ7uv8zNe4M5ITbds1A41o85PVVObnZvin1rAJgHpGgBrqNx7xkz9wV1sEOQMDwIDAQAB",
   "description": "Show what you are watching or listening to in Chrome on Discord.",
   "minimum_chrome_version": "119",
@@ -9,7 +9,19 @@
   "permissions": ["activeTab", "storage", "scripting", "nativeMessaging", "webNavigation"],
   "optional_host_permissions": ["http://*/*", "https://*/*", "file:///*"],
   "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "popup.html" },
+  "icons": {
+    "16": "branding/watchkit-16.png",
+    "32": "branding/watchkit-32.png",
+    "48": "branding/watchkit-48.png",
+    "128": "branding/watchkit-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "branding/watchkit-16.png",
+      "32": "branding/watchkit-32.png"
+    }
+  },
   "options_ui": { "page": "options.html", "open_in_tab": true },
   "commands": {
     "toggle-sharing": {

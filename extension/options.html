@@ -25,7 +25,7 @@
             <input id="application" type="password" inputmode="numeric" autocomplete="off" aria-describedby="application-hint">
             <button id="show-id" type="button" aria-controls="application" aria-label="Show Application ID">Show</button>
           </div>
-          <p class="hint" id="application-hint"><a href="https://github.com/smilekritik/browser-watchkit#get-a-discord-application-id" target="_blank" rel="noreferrer">Find your Application ID</a></p>
+          <p class="hint" id="application-hint">Uses the shared WatchKit application by default. Clear the field and save to restore it. <a href="https://github.com/smilekritik/browser-watchkit#connect-discord-in-chrome" target="_blank" rel="noreferrer">Discord setup</a></p>
           <label for="image">Fallback artwork key <span>(optional)</span></label>
           <input id="image" maxlength="64" pattern="[a-zA-Z0-9_\-]*" autocomplete="off" aria-describedby="image-hint">
           <p class="hint" id="image-hint">Enter an Art Assets key from your Discord application to use when the video has no preview.</p>
@@ -55,8 +55,11 @@
       <section class="panel" aria-labelledby="access-heading">
         <h2 id="access-heading"><svg class="icon" aria-hidden="true"><use href="icons.svg#globe"/></svg>Website access</h2>
         <div class="access-setting">
-          <p class="hint">Grant access to all websites to track embedded players on other domains. Manage individual sites from the toolbar popup.</p>
-          <button id="allow-all" type="button">Allow all websites</button>
+          <p class="hint">Allow YouTube, YouTube Music, Twitch and Kick together, or allow individual sites from the toolbar popup. All-sites access also supports players embedded from other domains.</p>
+          <div class="actions">
+            <button id="allow-media" type="button">Allow media sites</button>
+            <button id="allow-all" type="button">Allow all websites</button>
+          </div>
         </div>
         <p id="access-notice" class="hint feedback" role="status"></p>
         <div class="site-rules">

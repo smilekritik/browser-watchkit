@@ -1,10 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { allowedPage, bestMedia, bridgeAdvice, choosePlayback, defaultSettings, episodeFromUrl,
-  toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "../extension/activity.js";
+  playbackRemaining, toActivity, validId, watchLink, withEpisodePage, withPageMetadata } from "../extension/activity.js";
 
 const paused = { title: "Episode 4", position: 93, duration: 2514, rate: 1.25, state: "paused" };
-const normalDigits = value => value.detail.normalize("NFKC");
 
 test("reads the selected episode from playback routes on any host", () => {
   const miruro = "https://barelystarted.miruro.tv/watch/DlRBmYglhr_EA9RijDFnuQ20sg5uNmkI/aoashi-season-2?ep=7";
@@ -135,11 +134,15 @@ test("uses only the corresponding external player episode on an AniLiberty relea
   assert.equal(withPageMetadata({ ...player, source: "Vimeo" }, page).source, "Vimeo");
 });
 
-test("formats WatchKit timing at the actual playback speed", () => {
+test("shows the player's clock and keeps real time left for the popup", () => {
   const activity = toActivity(paused, "watchkit");
-  assert.equal(activity.title, "Episode 4 · ⏸\ufe0e");
-  assert.equal(normalDigits(activity), "01:33 / 41:54 · 1.25× · 32:17 left");
+  assert.equal(activity.title, "Episode 4");
+  assert.equal(activity.paused, true);
+  assert.equal(activity.detail, "01:33 / 41:54 · Speed 1.25×");
+  assert.equal(playbackRemaining(paused), "32:17 left");
+  assert.equal(playbackRemaining({ ...paused, position: paused.duration + 1 }), "00:00 left");
   assert.equal(activity.image, "watchkit");
+  assert.equal(activity.imageText, "32:17 left");
 });
 
 test("ignores the legacy VLC artwork key for browser activity", () => {
@@ -150,19 +153,46 @@ test("ignores the legacy VLC artwork key for browser activity", () => {
 });
 
 test("handles live and unknown duration without inventing remaining time", () => {
-  assert.equal(normalDigits(toActivity({ ...paused, live: true, duration: null })), "LIVE · 1.25×");
-  assert.equal(normalDigits(toActivity({ ...paused, duration: null })), "01:33 · 1.25×");
+  assert.equal(toActivity({ ...paused, live: true }).detail, "LIVE · Speed 1.25×");
+  assert.equal(toActivity({ ...paused, live: true, rate: 1 }).detail, "LIVE");
+  assert.equal(toActivity({ ...paused, duration: null }).detail, "01:33 · Speed 1.25×");
+  assert.equal(playbackRemaining({ ...paused, live: true }), "");
+  assert.equal(playbackRemaining({ ...paused, duration: null }), "");
+  assert.equal(toActivity({ ...paused, live: true }, "watchkit").imageText, "");
+  assert.equal(toActivity({ ...paused, duration: null }, "watchkit").imageText, "");
   assert.equal(toActivity({ ...paused, state: "ended" }), null);
   assert.equal(toActivity({ ...paused, rate: 0 }), null);
 });
 
-test("matches the VLC episode label, rate digits and hour columns", () => {
-  const activity = toActivity({
-    ...paused, title: "MobLand S01E04", duration: 7200, position: 7000, rate: 1
-  });
-  assert.equal(activity.title, "MobLand · S1 Ep.4 · ⏸\ufe0e");
-  assert.equal(normalDigits(activity), "1:56:40 / 2:00:00 · 1.00× · 0:03:20 left");
-  assert.ok(activity.detail.includes("𝟷.𝟶𝟶×"));
+test("preserves episode labels and hour columns without showing normal speed", () => {
+  const media = { ...paused, title: "MobLand S01E04", duration: 7200, position: 7000, rate: 1 };
+  const activity = toActivity(media);
+  assert.equal(activity.title, "MobLand · S1 Ep.4");
+  assert.equal(activity.detail, "1:56:40 / 2:00:00");
+  assert.equal(playbackRemaining(media), "0:03:20 left");
+});
+
+test("anchors Discord progress at normal speed and falls back to the media clock after speed changes", () => {
+  const sampledAt = 1_800_000_000_000;
+  const media = { ...paused, state: "playing", duration: 186, position: 107, rate: 1, sampledAt };
+  const activity = toActivity(media);
+  assert.equal(activity.start, 1_799_999_893);
+  assert.equal(activity.end, 1_800_000_079);
+  assert.equal(toActivity({ ...media, position: 112, sampledAt: sampledAt + 5000 }).end, activity.end);
+  assert.equal(toActivity({ ...media, position: 150 }).start, 1_799_999_850);
+  for (const rate of [0.75, 1.5, 2]) {
+    const accelerated = toActivity({ ...media, rate });
+    assert.equal(accelerated.detail, `01:47 / 03:06 · Speed ${rate}×`);
+    assert.equal(accelerated.start, undefined);
+    assert.equal(accelerated.end, undefined);
+  }
+  assert.equal(playbackRemaining({ ...media, rate: 1.5 }), "00:53 left");
+  assert.equal(toActivity({ ...media, rate: 1.5 }, "watchkit").imageText, "00:53 left");
+  for (const state of ["paused", "buffering"]) {
+    const stopped = toActivity({ ...media, state });
+    assert.equal(stopped.start, undefined);
+    assert.equal(stopped.end, undefined);
+  }
 });
 
 test("ignores stale frames and selects the strongest candidate", () => {
